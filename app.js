@@ -1,24 +1,24 @@
 // ==UserScript==
-// @name         B站首页和视频页一键拉黑up主
-// @description  在B站首页和视频页添加拉黑按钮，一键拉黑up主。
+// @name         B站首页和视频页一键拉黑UP主
+// @description  在B站首页和视频页添加拉黑按钮，一键拉黑UP主。
 // @match        https://bilibili.com/
 // @match        https://www.bilibili.com/*
 // @match        https://www.bilibili.com/video/*
 // @match        https://bilibili.com/video/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.0.1
+// @version      1.0.2
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
-// @namespace    https://space.bilibili.com/130876250?spm_id_from=namespace
-// @author       https://space.bilibili.com/130876250?spm_id_from=author
-// @supportURL   https://space.bilibili.com/130876250?spm_id_from=supportURL
-// @homepageURL  https://space.bilibili.com/130876250?spm_id_from=homepageURL
+// @namespace    https://github.com/codertesla/bilibili-1-click-blocker
+// @author       codertesla
+// @supportURL   https://github.com/codertesla/bilibili-1-click-blocker/issues
+// @homepageURL  https://github.com/codertesla/bilibili-1-click-blocker
 // @require      https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js
 // @license      MIT
-// @note         本脚本基于原脚本修改而来，原脚本无法正确运行，原脚本地址：https://greasyfork.org/zh-CN/scripts/526549-%E9%A6%96%E9%A1%B5%E4%B8%80%E9%94%AE%E6%8B%89%E9%BB%91up%E4%B8%BBbilibili-com
-// @updateURL    https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑up主
-// @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑up主
+// @note         本脚本基于原脚本修改而来，原脚本无法正确运行，原脚本地址：https://greasyfork.org/zh-CN/scripts/526549-首页一键拉黑up主bilibili-com
+// @updateURL    https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主
+// @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主
 // @created      2024-03-10
 // @updated      2024-03-10
 // ==/UserScript==
