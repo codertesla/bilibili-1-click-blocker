@@ -12,15 +12,15 @@
 // @grant        GM_addStyle
 // @namespace    https://github.com/codertesla/bilibili-1-click-blocker
 // @author       codertesla
-// @supportURL   https://github.com/codertesla/bilibili-1-click-blocker/issues
+// @supportURL   https://github.com/codertesla/bilibili-1-click-blocker
 // @homepageURL  https://github.com/codertesla/bilibili-1-click-blocker
 // @require      https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js
 // @license      MIT
 // @note         本脚本基于Greasy Fork脚本ID 526549进行改进和修复，原脚本存在运行问题，原脚本地址：https://greasyfork.org/zh-CN/scripts/526549-首页一键拉黑up主bilibili-com
 // @updateURL    https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
 // @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
-// @created      2024-03-10
-// @updated      2024-03-10
+// @created      2025-03-10
+// @updated      2025-03-10
 // ==/UserScript==
 
 (function () {
