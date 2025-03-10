@@ -1,5 +1,9 @@
 # B站首页和视频页一键拉黑UP主
 
+[![安装脚本](https://img.shields.io/badge/安装脚本-Greasy%20Fork-red.svg)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
+[![GitHub](https://img.shields.io/badge/GitHub-仓库-blue.svg)](https://github.com/codertesla/bilibili-1-click-blocker)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/codertesla/bilibili-1-click-blocker/blob/main/LICENSE)
+
 ## 功能介绍
 
 这是一个为B站（哔哩哔哩）用户设计的实用工具，可以帮助你快速管理不想看到的UP主内容。
@@ -11,6 +15,20 @@
 - **黑名单管理**：通过脚本菜单可以查看和管理已拉黑的UP主列表
 - **拉黑提示**：操作成功后会显示友好的提示信息
 - **自动过滤**：拉黑后B站将不再在首页推荐该UP主的内容
+
+## 安装方法
+
+1. 首先安装用户脚本管理器（如果已安装请跳过）：
+   - [Tampermonkey](https://www.tampermonkey.net/)（推荐，支持Chrome、Edge、Firefox等主流浏览器）
+   - [Violentmonkey](https://violentmonkey.github.io/)
+   - [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)（仅Firefox）
+
+2. 点击下面的安装链接安装脚本：
+   - [点击此处安装脚本](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
+
+3. 在弹出的安装页面中点击"安装"或"确认安装"按钮
+
+4. 安装完成后，刷新B站页面即可使用
 
 ## 使用方法
 
@@ -29,6 +47,11 @@
    - 在脚本菜单中选择"去管理黑名单"
    - 可以查看已拉黑UP主数量和列表
    - 支持从黑名单中移除UP主
+
+## 效果预览
+
+![首页拉黑效果](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/homepage.avif)
+![视频页拉黑效果](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/videopage.avif)
 
 ## 注意事项
 
@@ -59,12 +82,28 @@ A: B站推荐系统可能有缓存，建议等待一段时间或刷新页面。�
 ## 反馈与支持
 
 如有使用问题或功能建议，请通过以下方式联系：
-- 在Greasy Fork脚本页面留言
-- 访问脚本主页提交反馈
+- [在GitHub提交Issue](https://github.com/codertesla/bilibili-1-click-blocker/issues)
+- [在Greasy Fork脚本页面留言](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主/feedback)
+
+## 开发与贡献
+
+欢迎对本项目提出改进建议或贡献代码：
+
+1. Fork本仓库
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启一个Pull Request
 
 ## 致谢
 
-本脚本基于原脚本修改而来，感谢原作者的创意和贡献。由于原脚本存在一些运行问题，本脚本进行了修复和功能增强。
+本脚本基于另一个脚本修改而来，感谢原作者的创意和贡献。由于原脚本存在一些运行问题，本脚本进行了修复和功能增强。
+
+原脚本地址：[首页一键拉黑up主bilibili.com](https://greasyfork.org/zh-CN/scripts/526549-首页一键拉黑up主bilibili-com)
+
+## 许可证
+
+本项目采用MIT许可证 - 详情请参阅 [LICENSE](https://github.com/codertesla/bilibili-1-click-blocker/blob/main/LICENSE) 文件
 
 ---
 
