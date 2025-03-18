@@ -4,9 +4,9 @@
 // @match        https://bilibili.com/
 // @match        https://www.bilibili.com/*
 // @match        https://www.bilibili.com/video/*
-// @match        https://bilibili.com/video/*
+// @match        https://www.bilibili.com/video/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.0.3
+// @version      1.0.5
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -16,11 +16,8 @@
 // @homepageURL  https://github.com/codertesla/bilibili-1-click-blocker
 // @require      https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js
 // @license      MIT
-// @note         本脚本基于Greasy Fork脚本ID 526549进行改进和修复，原脚本存在运行问题，原脚本地址：https://greasyfork.org/zh-CN/scripts/526549-首页一键拉黑up主bilibili-com
 // @updateURL    https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
 // @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
-// @created      2025-03-10
-// @updated      2025-03-10
 // ==/UserScript==
 
 (function () {
