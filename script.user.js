@@ -6,7 +6,7 @@
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/video/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.0.5
+// @version      1.0.6
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -656,13 +656,29 @@
                 if (needsUpdate) {
                     log('检测到DOM变更，更新拉黑按钮');
                     processPage();
-                    // 检查导航栏
-                    checkAndFixNavbar();
                 }
             });
 
-            // 优化观察范围，确保包含导航栏
-            const targetNode = document.querySelector('#app') || document.body;
+            // 观察主要内容区域而不是整个body
+            const isVideoPage = window.location.href.includes('/video/');
+            let targetNode;
+
+            if (isVideoPage) {
+                // 视频页面选择主要内容区域，但避开导航栏
+                targetNode = document.querySelector('#app #viewbox_report') || // UP主信息通常在这里
+                    document.querySelector('#app .video-info-box') ||
+                    document.querySelector('#app .video-info-detail') ||
+                    document.querySelector('#app .video-container-v1') ||
+                    document.querySelector('#bilibiliPlayer') ||
+                    document.body; // 如果以上都不存在，则降级为body
+            } else {
+                // 首页选择主要内容区域
+                targetNode = document.querySelector('#app .bili-layout-main') ||
+                    document.querySelector('#app .bili-grid') ||
+                    document.querySelector('#app .feed-card') ||
+                    document.body; // 如果以上都不存在，则降级为body
+            }
+
             log('选择观察节点:', targetNode);
 
             observer.observe(targetNode, {
@@ -675,76 +691,11 @@
 
             log('DOM观察器已启动');
 
-            // 添加导航栏检查函数
-            function checkAndFixNavbar() {
-                const mainHeader = document.querySelector('#biliMainHeader');
-                const navbar = document.querySelector('.bili-header__bar');
-
-                if (!mainHeader || !navbar || !navbar.offsetHeight) {
-                    log('导航栏不可见，尝试修复');
-
-                    // 检查并修复主容器
-                    if (mainHeader) {
-                        mainHeader.style.display = 'none';
-                        setTimeout(() => {
-                            mainHeader.style.display = 'block';
-                            mainHeader.style.minHeight = '64px';
-                        }, 100);
-                    }
-
-                    // 检查并修复导航栏容器
-                    const headerWrapper = document.querySelector('.bili-header');
-                    if (headerWrapper) {
-                        headerWrapper.style.display = 'none';
-                        setTimeout(() => {
-                            headerWrapper.style.display = '';
-                            // 确保fixed-header类存在
-                            if (!headerWrapper.classList.contains('fixed-header')) {
-                                headerWrapper.classList.add('fixed-header');
-                            }
-                        }, 150);
-                    }
-
-                    // 检查并修复mini-header
-                    if (navbar) {
-                        navbar.style.display = 'none';
-                        setTimeout(() => {
-                            navbar.style.display = '';
-                            // 确保mini-header类存在
-                            if (!navbar.classList.contains('mini-header')) {
-                                navbar.classList.add('mini-header');
-                            }
-                        }, 200);
-                    }
-                }
-            }
-
-            // 优化观察器配置
-            const observerConfig = {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            };
-
-            // 初始检查导航栏
-            setTimeout(checkAndFixNavbar, 1000);
-
-            // 增加额外的检查点
-            setTimeout(checkAndFixNavbar, 2000);
-            setTimeout(checkAndFixNavbar, 3000);
-            setTimeout(checkAndFixNavbar, 5000);
+            // 初始加载时检查
+            setTimeout(processPage, 1000);
 
             // 页面可能是动态加载的，定期检查，但减少频率
-            window.blacklistInterval = setInterval(() => {
-                processPage();
-                checkAndFixNavbar();
-            }, 10000);
-
-            // 监听页面滚动事件
-            window.addEventListener('scroll', () => {
-                requestAnimationFrame(checkAndFixNavbar);
-            }, { passive: true });
+            window.blacklistInterval = setInterval(processPage, 5000);
         }
 
         // 暴露给全局作用域，方便调试
