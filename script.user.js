@@ -5,7 +5,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://www.bilibili.com/video/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.0.8
+// @version      1.1.1
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -204,9 +204,58 @@
 
 
         // 拉黑功能 (保持不变)
+        // === 更新后的 window.tools_toblack 函数 ===
         window.tools_toblack = (uid, upName) => {
             log('执行拉黑操作，UID:', uid, '名称:', upName);
             const isVideoPage = window.location.href.includes('/video/');
+
+            // --- 辅助函数：更新按钮状态为“已拉黑” ---
+            const setButtonToBlocked = (targetUid) => {
+                log(`准备将 UID ${targetUid} 的按钮状态更新为 '已拉黑'`);
+                let buttonUpdated = false;
+                // 选择器：查找带有特定 data-uid 且尚未被禁用的按钮
+                const selector = `.bilibili-blacklist-btn[data-uid="${targetUid}"]:not(:disabled)`;
+
+                // 优先尝试视频页结构
+                if (isVideoPage) {
+                    $(`div.upname:not([data-block-updated="true"])`).each(function () {
+                        const $upnameDiv = $(this);
+                        const $link = $upnameDiv.find(`a[href*="/${targetUid}"]`);
+                        if ($link.length > 0) {
+                            const $button = $link.find(selector);
+                            if ($button.length > 0) {
+                                log('找到视频页按钮，更新为已拉黑:', $button[0]);
+                                $button.text('已拉黑').css({ 'opacity': '0.6', 'cursor': 'not-allowed', 'background-color': '#eee', 'border-color': '#ddd', 'color': '#aaa' }).prop('disabled', true).off('click');
+                                $upnameDiv.attr('data-block-updated', 'true');
+                                buttonUpdated = true;
+                                return false; // 停止搜索
+                            }
+                        }
+                    });
+                }
+
+                // 如果视频页没找到，或者是在首页，进行通用查找
+                if (!buttonUpdated) {
+                    $(selector).each(function () {
+                        const $button = $(this);
+                        // 检查按钮是否可见，避免操作隐藏的按钮（虽然可能性小）
+                        if ($button.is(':visible')) {
+                            log('找到通用按钮，更新为已拉黑:', $button[0]);
+                            $button.text('已拉黑').css({ 'opacity': '0.6', 'cursor': 'not-allowed', 'background-color': '#eee', 'border-color': '#ddd', 'color': '#aaa' }).prop('disabled', true).off('click');
+                            buttonUpdated = true;
+                            // 首页可能有多张卡片，不停止搜索
+                        }
+                    });
+                }
+
+                if (!buttonUpdated) {
+                    log(`警告：未能找到 UID ${targetUid} 对应的按钮进行状态更新。`);
+                }
+            };
+            // --- 辅助函数结束 ---
+
+
+            // 执行 API 请求
             fetch("https://api.bilibili.com/x/relation/modify", {
                 method: "POST", credentials: 'include', headers: { "Content-Type": "application/x-www-form-urlencoded", },
                 body: new URLSearchParams({ 'fid': uid, 'act': 5, 're_src': 11, 'gaia_source': 'web_main', 'csrf': getCookie('bili_jct'), })
@@ -214,23 +263,35 @@
                 if (!res.ok) { throw new Error(`HTTP error! Status: ${res.status}`); } return res.json();
             }).then(data => {
                 log('拉黑API响应:', data);
-                if (data.code === 0) {
+                if (data.code === 0) { // 拉黑成功
                     log('拉黑成功:', uid);
-                    if (!isVideoPage) {
-                        // 在首页，找到包含这个UID的卡片并隐藏/移除
-                        // 使用 data-uid 属性来选择卡片可能更稳定
-                        $(`.bili-video-card[data-up-id="${uid}"], .feed-card[data-up-id="${uid}"], .video-card[data-up-id="${uid}"]`).each(function () {
-                            log('移除首页卡片:', this);
-                            $(this).fadeOut(300, function () { $(this).remove(); });
-                        });
-                        // 旧的移除逻辑，保留以防万一
-                        $('div.uid_' + uid).each(function () { log('移除元素 (旧):', this); $(this).fadeOut(300, function () { $(this).remove(); }); });
+                    showToast(`已成功将 "${upName || 'UP主'}" 加入黑名单`);
+                    setButtonToBlocked(uid); // 调用辅助函数更新按钮状态
+                    if (!isVideoPage) { // 首页额外操作：移除卡片
+                        log('执行首页移除操作...');
+                        $(`.bili-video-card[data-up-id="${uid}"], .feed-card[data-up-id="${uid}"], .video-card[data-up-id="${uid}"]`).fadeOut(300, function () { $(this).remove(); });
+                        $('div.uid_' + uid).fadeOut(300, function () { $(this).remove(); });
+                    }
+                } else { // 拉黑失败 (API返回错误码)
+                    log('拉黑失败:', data.message || `错误码 ${data.code}`);
 
-                        showToast(`已成功将 "${upName || 'UP主'}" 加入黑名单`);
-                    } else { showToast(`已成功将 "${upName || 'UP主'}" 加入黑名单`); }
-                } else { log('拉黑失败:', data.message || '未知错误'); showToast(`拉黑失败: ${data.message || '未知错误'}`); }
-            }).catch(err => { log('拉黑请求错误:', err); showToast('拉黑请求失败，可能是网络问题或未登录'); });
-            updateBlacklistCount();
+                    // === 新增：检查是否是 "已拉黑" 错误码 ===
+                    if (data.code === 22120) {
+                        log('检测到错误码 22120 (用户已被拉黑)');
+                        showToast('该用户已被拉黑'); // 显示更具体的提示
+                        setButtonToBlocked(uid); // 同样调用辅助函数更新按钮状态
+                    } else {
+                        // 对于其他所有错误，只显示通用失败提示，不改变按钮状态
+                        showToast(`拉黑失败: ${data.message || `错误码 ${data.code}`}`);
+                    }
+                    // === 检查结束 ===
+                }
+            }).catch(err => { // 网络请求错误等
+                log('拉黑请求错误:', err);
+                showToast('拉黑请求失败，请检查网络或登录状态');
+                // 网络错误不改变按钮状态
+            });
+            updateBlacklistCount(); // 更新黑名单计数
         };
 
 
@@ -392,9 +453,48 @@
                             else if (upUrl.includes('/space/')) { uid = upUrl.split('/space/')[1].split('?')[0].split('/')[0]; }
                             else { const match = upUrl.match(/\/(\d+)(\/|\?|$)/); if (match && match[1]) { uid = match[1]; } }
                             if (!uid || !/^\d+$/.test(uid)) { upnameDiv.attr('data-toblack-processed', 'true'); return; }
+                            // ... (code to extract uid and upName) ...
+
                             log('提取视频页UID:', uid, '名称:', upName);
                             const blackButton = $(`<a class="bilibili-blacklist-btn" data-uid="${uid}">拉黑</a>`);
-                            blackButton.on('click', function (e) { e.preventDefault(); e.stopPropagation(); window.tools_toblack(uid, upName); });
+
+                            // === MODIFIED CLICK HANDLER for Video Page ===
+                            blackButton.on('click', function (e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('[拉黑脚本] --- 视频页按钮点击事件触发 ---'); // Log: Handler Fired
+
+                                const buttonElement = $(this);
+                                // Re-read UID from the button's data attribute at the time of click
+                                const clickedUid = buttonElement.data('uid');
+                                // Use the name captured when the button was created (closure)
+                                // Alternatively, could try finding the name span again relative to buttonElement if needed
+                                const clickedName = upName;
+
+                                console.log('[拉黑脚本] 点击时获取的 UID:', clickedUid, typeof clickedUid);
+                                console.log('[拉黑脚本] 点击时获取的 Name:', clickedName);
+
+                                // Validate the UID before calling the API function
+                                if (!clickedUid || typeof clickedUid === 'undefined' || String(clickedUid).trim() === '' || !/^\d+$/.test(String(clickedUid))) {
+                                    console.error('[拉黑脚本] 错误：点击时 UID 无效!', clickedUid);
+                                    showToast('拉黑失败：无法获取有效的 UP 主 ID');
+                                    // Optionally add more specific error messages based on the condition
+                                    // if (!clickedUid) { showToast('拉黑失败：UID 未定义'); }
+                                    // else if (!/^\d+$/.test(String(clickedUid))) { showToast('拉黑失败：UID 非数字'); }
+                                    return; // Stop if UID is invalid
+                                }
+
+                                // If UID is valid, proceed to call the block function
+                                console.log('[拉黑脚本] UID 有效，准备调用 tools_toblack...');
+                                try {
+                                    window.tools_toblack(String(clickedUid), clickedName);
+                                } catch (apiError) {
+                                    console.error('[拉黑脚本] 调用 tools_toblack 时出错:', apiError);
+                                    showToast('拉黑操作内部出错，请检查控制台');
+                                }
+                            });
+                            // === END MODIFIED CLICK HANDLER ===
+
                             nameElement.after(blackButton); // Insert button after the name span
                             upnameDiv.attr('data-toblack-processed', 'true');
                             log('已添加拉黑按钮到视频页UP主:', upName);
