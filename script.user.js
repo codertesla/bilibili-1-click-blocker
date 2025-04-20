@@ -5,7 +5,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://www.bilibili.com/video/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.1.1
+// @version      1.1.2
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -41,8 +41,7 @@
         }
     }
 
-    // --- (可选) Debounce 函数 ---
-    /*
+    // --- Debounce 函数 ---
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -54,7 +53,6 @@
             timeout = setTimeout(later, wait);
         };
     }
-    */
     // ---
 
     // 主函数
@@ -543,8 +541,8 @@
             if (window.blacklistObserverSet) { log('观察器已存在，跳过设置'); return; }
             log('设置DOM观察器');
 
-            // --- (可选) Debounce 处理函数 ---
-            // const debouncedProcessPage = debounce(processPage, 300);
+            // --- Debounce 处理函数 ---
+            const debouncedProcessPage = debounce(processPage, 300);
             // ---
 
             const observer = new MutationObserver(function (mutations) {
@@ -560,10 +558,10 @@
 
                 if (needsUpdate) {
                     // log('检测到DOM变更，计划更新拉黑按钮'); // 减少日志
-                    // --- 使用 Debounce (可选) ---
-                    // debouncedProcessPage();
-                    // --- 不使用 Debounce ---
-                    processPage();
+                    // --- 使用 Debounce ---
+                    debouncedProcessPage();
+                    // --- 不使用 Debounce (注释掉) ---
+                    // processPage();
                     // ---
                 }
             });
