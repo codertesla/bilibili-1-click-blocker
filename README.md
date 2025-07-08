@@ -1,4 +1,4 @@
-# B站首页和视频页一键拉黑UP主
+# 油猴脚本:B站一键拉黑UP主
 
 [![安装脚本](https://img.shields.io/badge/安装脚本-Greasy%20Fork-red.svg)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 [![GitHub](https://img.shields.io/badge/GitHub-仓库-blue.svg)](https://github.com/codertesla/bilibili-1-click-blocker)
@@ -15,6 +15,16 @@
 - **黑名单管理**：通过脚本菜单可以查看和管理已拉黑的UP主列表
 - **拉黑提示**：操作成功后会显示友好的提示信息
 - **自动过滤**：拉黑后B站将不再在首页推荐该UP主的内容
+- **兼容性强**：支持B站**搜索结果页面**，并对第三方美化主题（如 **BewlyBewly**）进行深度适配。
+
+## 兼容性
+
+本脚本致力于兼容B站的各种使用环境，包括：
+
+- **B站官方页面**：首页、视频页、搜索结果页。
+- **第三方主题**：已对流行的 **BewlyBewly** 主题进行深度适配，解决了在 **Shadow DOM** 环境下的按钮样式丢失和点击无响应等问题。
+
+如果您在使用其他主题时遇到兼容性问题，欢迎通过 [GitHub Issues](https://github.com/codertesla/bilibili-1-click-blocker/issues) 向我们反馈。
 
 ## 安装方法
 
@@ -50,8 +60,17 @@
 
 ## 效果预览
 
+首页拉黑效果
+
 ![首页拉黑效果](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/homepage.avif)
+
+视频页拉黑效果
+
 ![视频页拉黑效果](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/videopage.avif)
+
+BewlyBewly首页拉黑效果
+
+![BewlyBewly首页拉黑效果](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/BewlyBewly.avif)
 
 ## 注意事项
 
@@ -74,8 +93,14 @@ A: 在黑名单管理页面可以找到误拉黑的UP主并取消拉黑。
 **Q: 为什么有些UP主拉黑后仍然出现在推荐中？**  
 A: B站推荐系统可能有缓存，建议等待一段时间或刷新页面。某些特殊推广内容可能不受黑名单影响。
 
+**Q: 我使用了其他B站美化脚本/主题，拉黑按钮不显示怎么办？**  
+A: 本脚本目前已对 `BewlyBewly` 主题进行了深度适配。如果您使用了其他主题导致按钮不显示，欢迎通过 [GitHub Issue](https://github.com/codertesla/bilibili-1-click-blocker/issues) 向我们反馈，我们会尽力适配。
+
 ## 更新日志
 
+- v1.1.8 (2025-03-12)：深度适配第三方主题 **BewlyBewly**，通过处理 **Shadow DOM**，彻底解决了在该主题下按钮样式丢失、点击后无响应的问题。
+- v1.1.4 (2025-03-11)：新增对 **B站搜索结果页面** 的支持，并为适配 `BewlyBewly` 主题进行初步探索和重构。
+- v1.1.2 (2025-03-11)：修复B站首页改版后按钮无法显示的问题，优化按钮插入逻辑。
 - v1.0.1 (2025-03-10)：修复了部分页面拉黑按钮不显示的问题
 - v1.0.0 (2025-03-10)：首次发布，实现基本功能
 
