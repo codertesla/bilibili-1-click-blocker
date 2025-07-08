@@ -6,7 +6,7 @@
 // @match        https://www.bilibili.com/video/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.1.8
+// @version      1.1.9
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -99,11 +99,43 @@
           margin: 0 !important; /* 悬浮按钮不需要外边距 */
         }
 
-        /* --- Toast 提示样式 (保持不变) --- */
-        .bili-blacklist-toast { /* ... 省略不变的样式 ... */ }
-        @keyframes toastIn { /* ... 省略不变的样式 ... */ }
-        .bili-blacklist-toast-icon { /* ... 省略不变的样式 ... */ }
-        .bili-blacklist-toast-content { /* ... 省略不变的样式 ... */ }
+        /* --- Toast 提示样式 (v1.1.9 优化) --- */
+        .bili-blacklist-toast {
+            position: fixed !important;
+            z-index: 99999 !important;
+            top: 30px !important;
+            left: 50% !important;
+            transform: translateX(-50%) translateY(0) !important;
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            color: white !important;
+            padding: 10px 20px !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            transition: opacity 0.3s ease, transform 0.3s ease !important;
+            opacity: 1 !important;
+            animation: toastIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+        }
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px) !important;
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) !important;
+            }
+        }
+        .bili-blacklist-toast-icon {
+            font-size: 18px !important;
+            line-height: 1 !important;
+        }
+        .bili-blacklist-toast-content {
+            line-height: 1.5 !important;
+        }
 
         /* --- 新增：插件修改布局的适配样式 --- */
         /* 适配 group/desc 布局中的 channel-name 按钮 */
@@ -165,7 +197,7 @@
 
     // 主函数
     waitForJQuery(function ($) {
-        log('脚本初始化开始 v1.1.8-shadow-dom-fix');
+        log('脚本初始化开始 v1.1.9-toast-fix');
 
         // --- 样式注入 ---
         // 1. 注入到主文档
@@ -238,8 +270,11 @@
             const toast = $(`<div class="bili-blacklist-toast"><span class="bili-blacklist-toast-icon">✓</span><div class="bili-blacklist-toast-content">${message}</div></div>`);
             $('body').append(toast);
             setTimeout(() => {
-                toast.css({ 'opacity': '0', 'transform': 'translate(-50%, -20px)', 'transition': 'opacity 0.3s ease, transform 0.3s ease' });
-                setTimeout(() => toast.remove(), 300);
+                toast.css({
+                    'opacity': '0',
+                    'transform': 'translateX(-50%) translateY(-20px)'
+                });
+                setTimeout(() => toast.remove(), 300); // 等待动画完成再移除
             }, duration);
         }
 
