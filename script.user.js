@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         B站首页、视频页和搜索页一键拉黑UP主
+// @name         B站一键拉黑UP主
 // @description  在B站首页、视频页和搜索页添加拉黑按钮，一键拉黑UP主。完整支持BewlyBewly插件首页布局适配。
 // @match        https://bilibili.com/
 // @match        https://www.bilibili.com/*
