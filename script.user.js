@@ -6,9 +6,10 @@
 // @match        https://www.bilibili.com/video/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.2.0
+// @version      1.1.9
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
+// @grant        GM_addStyle
 // @namespace    https://github.com/codertesla/bilibili-1-click-blocker
 // @author       codertesla
 // @supportURL   https://github.com/codertesla/bilibili-1-click-blocker
@@ -22,849 +23,792 @@
 (function () {
     'use strict';
 
-    const SCRIPT_NS = 'biliBlacklist';
-    const DEBUG_STORAGE_KEY = `${SCRIPT_NS}Debug`;
-    let debugEnabled = false;
-    try {
-        debugEnabled = window.localStorage && window.localStorage.getItem(DEBUG_STORAGE_KEY) === 'true';
-    } catch (error) {
-        console.warn('[拉黑脚本] 无法读取本地调试配置:', error);
-    }
-
-    function log(...args) {
-        if (debugEnabled) {
-            console.log('[拉黑脚本]', ...args);
-        }
-    }
-
-    window.biliBlacklistDebugControl = {
-        enable() {
-            try { window.localStorage.setItem(DEBUG_STORAGE_KEY, 'true'); } catch (error) { console.error('[拉黑脚本] 无法开启调试模式:', error); }
-            debugEnabled = true;
-            log('调试模式已开启');
-        },
-        disable() {
-            try { window.localStorage.removeItem(DEBUG_STORAGE_KEY); } catch (error) { console.error('[拉黑脚本] 无法关闭调试模式:', error); }
-            debugEnabled = false;
-            console.log('[拉黑脚本] 调试模式已关闭');
-        },
-        toggle(force) {
-            const nextState = typeof force === 'boolean' ? force : !debugEnabled;
-            nextState ? this.enable() : this.disable();
-        },
-        get enabled() { return debugEnabled; }
-    };
-
+    // --- 样式定义 ---
     const BILI_BLACKLIST_STYLES = `
+        /* 通用按钮样式 */
         .bilibili-blacklist-btn {
-            color: #fb7299 !important;
-            cursor: pointer !important;
-            font-weight: normal !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 1px 6px !important;
-            border: 1px solid #fb7299 !important;
-            border-radius: 4px !important;
-            font-size: 11px !important;
-            transition: all 0.2s ease !important;
-            background-color: #fff !important;
-            box-shadow: 0 0 2px rgba(251, 114, 153, 0.2) !important;
-            min-width: auto !important;
-            line-height: normal !important;
-            text-decoration: none !important;
-            gap: 2px !important;
-            user-select: none !important;
+          color: #fb7299 !important;
+          cursor: pointer !important;
+          font-weight: normal !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 1px 5px !important;
+          border: 1px solid #fb7299 !important;
+          border-radius: 4px !important;
+          font-size: 11px !important; /* 统一基础字号 */
+          transition: all 0.2s ease !important;
+          background-color: white !important;
+          box-shadow: 0 0 2px rgba(251, 114, 153, 0.2) !important;
+          width: auto !important;
+          min-width: unset !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+          text-align: center !important;
+          white-space: nowrap !important;
+          gap: 1px !important;
+          vertical-align: middle; /* 垂直对齐 */
+          line-height: normal; /* 正常行高 */
+          margin: 0 5px 0 0 !important; /* 默认右边距，给后面元素空间 */
         }
         .bilibili-blacklist-btn:hover {
-            background-color: #fb7299 !important;
-            color: #fff !important;
-            box-shadow: 0 0 4px rgba(251, 114, 153, 0.35) !important;
+          background-color: #fb7299 !important;
+          color: white !important;
+          box-shadow: 0 0 4px rgba(251, 114, 153, 0.4) !important;
         }
         .bilibili-blacklist-btn:active {
-            transform: scale(0.95) !important;
+          transform: scale(0.95) !important;
         }
-        .bilibili-blacklist-btn[data-state="loading"] {
-            cursor: wait !important;
-            opacity: 0.7 !important;
+        .bilibili-blacklist-btn::before {
+          content: "" !important; margin-right: 0 !important; width: 0 !important;
         }
-        .bilibili-blacklist-btn--blocked,
-        .bilibili-blacklist-btn[data-state="blocked"] {
-            background-color: #eee !important;
-            border-color: #ddd !important;
-            color: #999 !important;
-            cursor: not-allowed !important;
-            opacity: 0.8 !important;
-        }
+        /* 按钮动画 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .bilibili-blacklist-btn { animation: fadeIn 0.3s ease-out !important; }
+
+        /* --- 首页特定调整 --- */
+        /* 将按钮添加到 info--bottom 前面时 */
         .bili-video-card__info--bottom > .bilibili-blacklist-btn {
-            margin-right: 8px !important;
+          /* 首页按钮放在前面，给右边距 */
+          margin-right: 8px !important;
+          margin-left: 0 !important;
         }
+
+         /* --- 视频页特定调整 --- */
+        /* 将按钮添加到 upname > a > span.name 后面时 */
         .upname a > .bilibili-blacklist-btn {
-            margin-left: 6px !important;
-            font-size: 10px !important;
-            padding: 0 5px !important;
+           margin-left: 5px !important; /* 视频页按钮放名字后面，给左边距 */
+           margin-right: 0 !important;
+           font-size: 10px !important; /* 视频页按钮可以小一点 */
+           padding: 0px 4px !important;
         }
+
+        /* --- 卡片悬浮按钮特定调整 --- */
         .blacklist-button-container {
-            position: absolute !important;
-            top: 6px !important;
-            right: 6px !important;
-            z-index: 50 !important;
-            opacity: 0 !important;
-            transition: opacity 0.2s ease !important;
+          position: absolute !important; top: 5px !important; right: 5px !important; z-index: 100 !important;
+          opacity: 0 !important; transition: opacity 0.2s ease !important;
         }
         .bili-video-card:hover .blacklist-button-container,
         .video-card:hover .blacklist-button-container,
-        .feed-card:hover .blacklist-button-container,
-        .group\/desc:hover .blacklist-button-container {
-            opacity: 1 !important;
+        .feed-card:hover .blacklist-button-container {
+          opacity: 1 !important;
         }
         .blacklist-button-container .bilibili-blacklist-btn {
-            padding: 0 4px !important;
-            font-size: 10px !important;
-            margin: 0 !important;
+          padding: 0px 4px !important; font-size: 10px !important;
+          min-width: unset !important; max-width: none !important; white-space: nowrap !important;
+          margin: 0 !important; /* 悬浮按钮不需要外边距 */
         }
+
+        /* --- Toast 提示样式 (v1.1.9 优化) --- */
         .bili-blacklist-toast {
             position: fixed !important;
             z-index: 99999 !important;
             top: 30px !important;
             left: 50% !important;
             transform: translateX(-50%) translateY(0) !important;
-            background-color: rgba(0, 0, 0, 0.82) !important;
-            color: #fff !important;
-            padding: 10px 18px !important;
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            color: white !important;
+            padding: 10px 20px !important;
             border-radius: 8px !important;
             font-size: 14px !important;
             display: flex !important;
             align-items: center !important;
             gap: 10px !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18) !important;
-            opacity: 1 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
             transition: opacity 0.3s ease, transform 0.3s ease !important;
+            opacity: 1 !important;
+            animation: toastIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
         }
-        .bili-blacklist-toast.is-hiding {
-            opacity: 0 !important;
-            transform: translateX(-50%) translateY(-18px) !important;
-        }
-        .bili-blacklist-toast[data-type="error"] {
-            background-color: rgba(219, 68, 83, 0.92) !important;
-        }
-        .bili-blacklist-toast[data-type="warning"] {
-            background-color: rgba(255, 170, 0, 0.92) !important;
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px) !important;
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) !important;
+            }
         }
         .bili-blacklist-toast-icon {
             font-size: 18px !important;
             line-height: 1 !important;
         }
         .bili-blacklist-toast-content {
-            line-height: 1.4 !important;
+            line-height: 1.5 !important;
         }
-        [data-bili-blacklist-hidden="true"] {
-            pointer-events: none !important;
+
+        /* --- 新增：插件修改布局的适配样式 --- */
+        /* 适配 group/desc 布局中的 channel-name 按钮 */
+        .group\\/desc .channel-name + .bilibili-blacklist-btn {
+          margin-left: 8px !important;
+          margin-right: 0 !important;
+          font-size: 10px !important;
+          padding: 1px 4px !important;
+          vertical-align: middle !important;
         }
-        .group\/desc .channel-name + .bilibili-blacklist-btn {
-            margin-left: 8px !important;
-            font-size: 10px !important;
-            padding: 1px 4px !important;
+
+        /* 适配插件修改布局的悬浮按钮容器 */
+        .group\\/desc .blacklist-button-container {
+          position: absolute !important;
+          top: 8px !important;
+          right: 8px !important;
+          z-index: 100 !important;
+          opacity: 0 !important;
+          transition: opacity 0.2s ease !important;
         }
-        .group\/desc .blacklist-button-container {
-            position: absolute !important;
-            top: 8px !important;
-            right: 8px !important;
-            opacity: 0 !important;
+
+        .group\\/desc:hover .blacklist-button-container {
+          opacity: 1 !important;
         }
     `;
 
-    const SELECTORS = {
-        feedCards: [
-            '.bili-video-card',
-            '.bili-video-card__wrap',
-            '.feed-card',
-            '.video-card',
-            '.group\\/desc'
-        ],
-        searchCards: [
-            '.video-list .video-item',
-            '.search-content .bili-video-card',
-            '.bili-video-card',
-            '.video-item.matrix'
-        ],
-        videoOwnerContainers: [
-            'div.upname',
-            '.up-info_right'
-        ]
-    };
-
-    const FEED_CARD_SELECTOR = SELECTORS.feedCards.join(',');
-    const SEARCH_CARD_SELECTOR = SELECTORS.searchCards.join(',');
-    const VIDEO_OWNER_SELECTOR = SELECTORS.videoOwnerContainers.join(',');
-
-    const MUTATION_PIPELINE = (() => {
-        const listeners = new Set();
-        return {
-            add(listener) { listeners.add(listener); },
-            remove(listener) { listeners.delete(listener); },
-            dispatch(mutations) {
-                listeners.forEach((listener) => {
-                    try { listener(mutations); } catch (error) { log('Mutation listener error', error); }
-                });
-            }
-        };
-    })();
-
-    const shadowRootListeners = new Set();
-    function onShadowRootDiscovered(callback) { shadowRootListeners.add(callback); }
-    function notifyShadowRoot(root) {
-        shadowRootListeners.forEach((callback) => {
-            try { callback(root); } catch (error) { log('Shadow root listener error', error); }
-        });
+    // 调试功能
+    const DEBUG = true;
+    function log(...args) {
+        if (DEBUG) {
+            console.log('[拉黑脚本]', ...args);
+        }
     }
 
-    const buttonEntryMap = new WeakMap();
+    // 等待jQuery加载
+    function waitForJQuery(callback) {
+        if (typeof jQuery !== 'undefined') {
+            log('jQuery已加载');
+            callback(jQuery);
+        } else {
+            log('等待jQuery加载...');
+            setTimeout(function () { waitForJQuery(callback); }, 50);
+        }
+    }
 
-    const buttonRegistry = (() => {
-        const registry = new Map();
-        const removedCards = new WeakSet();
+    // --- Debounce 函数 ---
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    // ---
 
-        function register(uid, entry) {
-            if (!registry.has(uid)) {
-                registry.set(uid, new Set());
-            }
-            registry.get(uid).add(entry);
+    // 主函数
+    waitForJQuery(function ($) {
+        log('脚本初始化开始 v1.1.9-toast-fix');
+
+        // --- 样式注入 ---
+        // 1. 注入到主文档
+        if (typeof GM_addStyle !== 'undefined') {
+            GM_addStyle(BILI_BLACKLIST_STYLES);
         }
 
-        function markBlocked(uid) {
-            const entries = registry.get(uid);
-            if (!entries) { return; }
-            entries.forEach((entry) => {
-                const { button, card } = entry;
-                if (button) {
-                    button.textContent = '已拉黑';
-                    button.setAttribute('data-state', 'blocked');
-                    button.classList.add('bilibili-blacklist-btn--blocked');
-                    button.disabled = true;
-                    button.ariaDisabled = 'true';
-                }
-                if (entry.pageType !== 'video' && card && card.isConnected && !removedCards.has(card)) {
-                    removedCards.add(card);
-                    card.setAttribute('data-bili-blacklist-hidden', 'true');
-                    card.style.transition = card.style.transition || 'opacity 0.25s ease';
-                    card.style.opacity = '0';
-                    window.setTimeout(() => {
-                        if (card.parentElement) {
-                            card.parentElement.removeChild(card);
-                        }
-                    }, 250);
+        // 2. 注入到 Shadow DOM
+        const injectedShadowHosts = new WeakSet();
+        function injectStylesIntoShadowDOMs(css) {
+            document.querySelectorAll('*').forEach(el => {
+                if (el.shadowRoot && !injectedShadowHosts.has(el)) {
+                    const style = document.createElement('style');
+                    style.textContent = css;
+                    el.shadowRoot.appendChild(style);
+                    injectedShadowHosts.add(el);
+                    log(`[Shadow DOM] Styles injected into:`, el);
                 }
             });
         }
+        // ---
 
-        return {
-            register,
-            markBlocked
-        };
-    })();
-
-    const BiliToast = (() => {
-        let hideTimer = null;
-        return {
-            show(message, { type = 'info', duration = 3000 } = {}) {
-                if (!message) { return; }
-                if (hideTimer) { window.clearTimeout(hideTimer); hideTimer = null; }
-                const existing = document.querySelector('.bili-blacklist-toast');
-                if (existing) { existing.remove(); }
-
-                const toast = document.createElement('div');
-                toast.className = 'bili-blacklist-toast';
-                toast.dataset.type = type;
-
-                const icon = document.createElement('span');
-                icon.className = 'bili-blacklist-toast-icon';
-                icon.textContent = type === 'error' ? '✕' : (type === 'warning' ? '!' : '✓');
-
-                const content = document.createElement('div');
-                content.className = 'bili-blacklist-toast-content';
-                content.textContent = message;
-
-                toast.append(icon, content);
-                document.body.appendChild(toast);
-
-                hideTimer = window.setTimeout(() => {
-                    toast.classList.add('is-hiding');
-                    window.setTimeout(() => toast.remove(), 300);
-                }, duration);
-            }
-        };
-    })();
-
-    function sanitizeText(value) {
-        return (value || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function extractUidFromUrl(rawUrl) {
-        if (!rawUrl) { return ''; }
-        let normalized = rawUrl;
-        try {
-            normalized = new URL(rawUrl, window.location.origin).href;
-        } catch (error) {
-            // ignore URL parsing failures and fallback to raw string matching
-        }
-        const patterns = [
-            /space\.bilibili\.com\/(\d+)/i,
-            /\/space\/(\d+)/i,
-            /\/u\/(\d+)/i
-        ];
-        for (const pattern of patterns) {
-            const match = normalized.match(pattern);
-            if (match && match[1]) {
-                return match[1];
-            }
-        }
-        const fallback = normalized.match(/\/(\d+)(?:[/?#]|$)/);
-        return fallback && fallback[1] ? fallback[1] : '';
-    }
-
-    function getCsrfToken() {
-        const name = 'bili_jct';
-        const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
-            const [key, value] = cookie.trim().split('=');
-            if (key === name) {
-                return value || '';
-            }
-        }
-        return '';
-    }
-
-    async function blockUser(uid, csrfToken) {
-        const endpoint = 'https://api.bilibili.com/x/relation/modify';
-        const payload = new URLSearchParams({
-            fid: uid,
-            act: '5',
-            re_src: '11',
-            gaia_source: 'web_main',
-            csrf: csrfToken
-        });
-
-        let response;
-        try {
-            response = await window.fetch(endpoint, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                body: payload.toString()
-            });
-        } catch (error) {
-            const networkError = new Error('网络请求失败');
-            networkError.userMessage = '拉黑请求失败，请检查网络或登录状态';
-            networkError.cause = error;
-            throw networkError;
+        // Cookie获取函数 (保持不变)
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
         }
 
-        if (!response.ok) {
-            const httpError = new Error(`HTTP ${response.status}`);
-            httpError.userMessage = `拉黑失败：服务暂时不可用 (HTTP ${response.status})`;
-            throw httpError;
+        // 检查是否登录 (保持不变)
+        const csrf = getCookie('bili_jct');
+        if (!csrf) {
+            log('警告: 未获取到bili_jct Cookie，可能未登录');
+            showToast('B站拉黑脚本提示：请先登录B站账号！', 5000);
+        } else {
+            log('成功获取CSRF token');
         }
 
-        let data;
-        try {
-            data = await response.json();
-        } catch (error) {
-            const parseError = new Error('响应解析失败');
-            parseError.userMessage = '拉黑失败：无法解析服务器响应';
-            parseError.cause = error;
-            throw parseError;
-        }
-
-        if (data.code !== 0 && data.code !== 22120) {
-            const apiError = new Error(data.message || `API code ${data.code}`);
-            apiError.userMessage = `拉黑失败：${data.message || `错误码 ${data.code}`}`;
-            apiError.apiCode = data.code;
-            throw apiError;
-        }
-
-        return data;
-    }
-
-    function createMenuController() {
-        const state = {
-            total: 0,
-            menuId: null
-        };
-
-        const formatTitle = () => `去管理黑名单 --（ ${state.total > 0 ? `总共：${state.total} ）` : '请留意黑名单数量 ）' }`;
-
-        function unregister() {
-            if (state.menuId !== null && typeof GM_unregisterMenuCommand === 'function') {
-                try { GM_unregisterMenuCommand(state.menuId); } catch (error) { log('解除GM菜单失败', error); }
-                state.menuId = null;
-            }
-        }
-
-        function register() {
-            unregister();
-            if (typeof GM_registerMenuCommand === 'function') {
+        // 菜单控制 (保持不变)
+        const menuctl = ({ initValue = 0 }) => {
+            let total = initValue;
+            let menuId = null;
+            const currentName = () => "去管理黑名单 --（ " + (total < 1 ? "请留意黑名单数量 ）" : `总共：${total} ）`);
+            const register = () => {
                 try {
-                    state.menuId = GM_registerMenuCommand(formatTitle(), () => {
+                    menuId = GM_registerMenuCommand(currentName(), () => {
                         window.open('https://account.bilibili.com/account/blacklist', '_blank');
                     });
-                } catch (error) {
-                    log('注册GM菜单失败', error);
-                }
-            }
-        }
-
-        register();
-
-        return {
-            update(total) {
-                if (typeof total === 'number' && total >= 0 && total !== state.total) {
-                    state.total = total;
+                    log('注册菜单成功: ', currentName());
+                } catch (e) { log('注册菜单失败: ', e); }
+            };
+            register();
+            const ctl = {
+                get total() { return total; },
+                set total(newValue) {
+                    if (newValue == total) return;
+                    if (menuId !== null) { try { GM_unregisterMenuCommand(menuId); log('解除注册旧菜单'); } catch (e) { log('解除注册旧菜单失败: ', e); } }
+                    total = newValue;
                     register();
-                }
-            },
-            dispose() { unregister(); }
+                },
+            };
+            return ctl;
         };
-    }
+        const menu = menuctl({ initValue: 0 });
 
-    const menuController = createMenuController();
-    let lastBlacklistFetch = 0;
-    const BLACKLIST_REFRESH_INTERVAL = 30 * 1000;
-
-    async function updateBlacklistCount(force = false) {
-        const now = Date.now();
-        if (!force && now - lastBlacklistFetch < BLACKLIST_REFRESH_INTERVAL) {
-            return;
-        }
-        lastBlacklistFetch = now;
-        try {
-            const response = await window.fetch('https://api.bilibili.com/x/relation/blacks?re_version=0&pn=1&ps=20&jsonp=jsonp&web_location=333.33', {
-                method: 'GET',
-                credentials: 'include'
-            });
-            if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
-            const data = await response.json();
-            if (data.code === 0 && data.data && typeof data.data.total === 'number') {
-                menuController.update(data.data.total);
-            }
-        } catch (error) {
-            log('获取黑名单数量失败', error);
-        }
-    }
-
-    const StyleManager = (() => {
-        const STYLE_MARK = 'data-bili-blacklist-style';
-        const processedRoots = new WeakSet();
-
-        function ensureDocumentStyle() {
-            if (!document.head.querySelector(`style[${STYLE_MARK}]`)) {
-                const style = document.createElement('style');
-                style.setAttribute(STYLE_MARK, '');
-                style.textContent = BILI_BLACKLIST_STYLES;
-                document.head.appendChild(style);
-            }
+        // 显示自定义提示框 (保持不变)
+        function showToast(message, duration = 3000) {
+            $('.bili-blacklist-toast').remove();
+            const toast = $(`<div class="bili-blacklist-toast"><span class="bili-blacklist-toast-icon">✓</span><div class="bili-blacklist-toast-content">${message}</div></div>`);
+            $('body').append(toast);
+            setTimeout(() => {
+                toast.css({
+                    'opacity': '0',
+                    'transform': 'translateX(-50%) translateY(-20px)'
+                });
+                setTimeout(() => toast.remove(), 300); // 等待动画完成再移除
+            }, duration);
         }
 
-        function injectIntoShadowRoot(root) {
-            if (!root || processedRoots.has(root)) { return; }
-            try {
-                const style = document.createElement('style');
-                style.setAttribute(STYLE_MARK, '');
-                style.textContent = BILI_BLACKLIST_STYLES;
-                root.appendChild(style);
-                processedRoots.add(root);
-                notifyShadowRoot(root);
-            } catch (error) {
-                log('向ShadowRoot注入样式失败', error);
-            }
-        }
 
-        function inspectNode(node) {
-            if (!node) { return; }
-            if (node instanceof Element && node.shadowRoot) {
-                injectIntoShadowRoot(node.shadowRoot);
-            }
-            const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
-            while (walker.nextNode()) {
-                const current = walker.currentNode;
-                if (current.shadowRoot) {
-                    injectIntoShadowRoot(current.shadowRoot);
+        // 拉黑功能 (保持不变)
+        // === 更新后的 window.tools_toblack 函数 ===
+        window.tools_toblack = (uid, upName) => {
+            log('执行拉黑操作，UID:', uid, '名称:', upName);
+            const isVideoPage = window.location.href.includes('/video/');
+
+            // --- 辅助函数：更新按钮状态为“已拉黑” ---
+            const setButtonToBlocked = (targetUid) => {
+                log(`准备将 UID ${targetUid} 的按钮状态更新为 '已拉黑'`);
+                const selector = `.bilibili-blacklist-btn[data-uid="${targetUid}"]:not(:disabled)`;
+
+                // 使用 findInShadowDOM 查找按钮，以兼容所有情况
+                findInShadowDOM(selector).each(function () {
+                    const $button = $(this);
+                    if ($button.is(':visible')) {
+                        log('找到按钮并更新为已拉黑:', $button[0]);
+                        $button.text('已拉黑').css({ 'opacity': '0.6', 'cursor': 'not-allowed', 'background-color': '#eee', 'border-color': '#ddd', 'color': '#aaa' }).prop('disabled', true).off('click');
+                    }
+                });
+            };
+            // --- 辅助函数结束 ---
+
+
+            // 执行 API 请求
+            fetch("https://api.bilibili.com/x/relation/modify", {
+                method: "POST", credentials: 'include', headers: { "Content-Type": "application/x-www-form-urlencoded", },
+                body: new URLSearchParams({ 'fid': uid, 'act': 5, 're_src': 11, 'gaia_source': 'web_main', 'csrf': getCookie('bili_jct'), })
+            }).then(res => {
+                if (!res.ok) { throw new Error(`HTTP error! Status: ${res.status}`); } return res.json();
+            }).then(data => {
+                log('拉黑API响应:', data);
+                if (data.code === 0) { // 拉黑成功
+                    log('拉黑成功:', uid);
+                    showToast(`已成功将 "${upName || 'UP主'}" 加入黑名单`);
+                    setButtonToBlocked(uid); // 调用辅助函数更新按钮状态
+                    if (!isVideoPage) { // 首页额外操作：移除卡片
+                        log('执行首页移除操作...');
+                        // 同时在主文档和 Shadow DOM 中查找并移除卡片
+                        const cardSelectors = [
+                            `.bili-video-card[data-up-id="${uid}"]`,
+                            `.feed-card[data-up-id="${uid}"]`,
+                            `.video-card[data-up-id="${uid}"]`,
+                            `.group\\/desc[data-up-id="${uid}"]`,
+                            `div.uid_${uid}`
+                        ].join(', ');
+                        findInShadowDOM(cardSelectors).fadeOut(300, function () { $(this).remove(); });
+                    }
+                } else { // 拉黑失败 (API返回错误码)
+                    log('拉黑失败:', data.message || `错误码 ${data.code}`);
+
+                    // === 新增：检查是否是 "已拉黑" 错误码 ===
+                    if (data.code === 22120) {
+                        log('检测到错误码 22120 (用户已被拉黑)');
+                        showToast('该用户已被拉黑'); // 显示更具体的提示
+                        setButtonToBlocked(uid); // 同样调用辅助函数更新按钮状态
+                    } else {
+                        // 对于其他所有错误，只显示通用失败提示，不改变按钮状态
+                        showToast(`拉黑失败: ${data.message || `错误码 ${data.code}`}`);
+                    }
+                    // === 检查结束 ===
                 }
-            }
+            }).catch(err => { // 网络请求错误等
+                log('拉黑请求错误:', err);
+                showToast('拉黑请求失败，请检查网络或登录状态');
+                // 网络错误不改变按钮状态
+            });
+            updateBlacklistCount(); // 更新黑名单计数
+        };
+
+
+        // 更新黑名单计数 (保持不变)
+        function updateBlacklistCount() {
+            fetch("https://api.bilibili.com/x/relation/blacks?re_version=0&pn=1&ps=20&jsonp=jsonp&web_location=333.33", {
+                method: "GET", credentials: 'include',
+            }).then(res => {
+                if (!res.ok) { throw new Error(`HTTP error! Status: ${res.status}`); } return res.json();
+            }).then(data => {
+                log('黑名单API响应:', data); if (data.code === 0) { menu.total = data.data.total; log('更新黑名单计数:', data.data.total); }
+                else { log('获取黑名单失败:', data.message || '未知错误'); }
+            }).catch(err => { log('获取黑名单请求错误:', err); });
         }
 
-        return {
-            init() {
-                ensureDocumentStyle();
-                injectIntoShadowRoot(document.documentElement.shadowRoot);
-                inspectNode(document.documentElement);
-            },
-            handleMutations(mutations) {
-                mutations.forEach((mutation) => {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node instanceof Element || node instanceof DocumentFragment) {
-                            inspectNode(node);
+        // --- 新增：Shadow DOM 搜索函数 ---
+        function findInShadowDOM(selector) {
+            let results = $(selector);
+            // 遍历所有元素，检查是否有 shadowRoot
+            log('  [Shadow DOM] 开始搜索...');
+            $('*').each(function (index, el) {
+                if (this.shadowRoot) {
+                    log(`  [Shadow DOM] 在元素 ${el.tagName}.${el.className} 中找到 shadowRoot`);
+                    const shadowResults = $(this.shadowRoot).find(selector);
+                    if (shadowResults.length > 0) {
+                        log(`    [Shadow DOM] 找到 ${shadowResults.length} 个匹配 "${selector}" 的元素`);
+                        results = results.add(shadowResults);
+                    }
+                }
+            });
+            log(`  [Shadow DOM] 搜索结束，共找到 ${results.length} 个结果`);
+            return results;
+        }
+
+        // === 处理首页 (已修改，新增插件布局适配) ===
+        function processHomePage() {
+            log('处理首页');
+
+            // 全局调试：检查页面基本状态
+            log('=== 页面基本状态 ===');
+            log(`jQuery版本: ${$.fn.jquery}, 页面URL: ${window.location.href}`);
+            log(`页面title: ${document.title}`);
+            log(`DOM中总div数量: ${$('div').length}`);
+            log(`包含data-v-属性的元素数量: ${$('[data-v-89bbbbc2]').length}`);
+            log(`包含class="video-card"的元素数量: ${$('.video-card').length}`);
+            log(`包含class包含"video"的元素数量: ${$('[class*="video"]').length}`);
+
+            const possibleContainers = ['.bili-video-card', '.video-card', '.bili-video-card__wrap', '.feed-card', '.group\\/desc'];
+            let foundCards = false;
+
+            // 调试：检查页面中存在哪些可能的容器
+            log('=== 首页调试信息 ===');
+            possibleContainers.forEach(selector => {
+                const allElements = $(selector);
+                const unprocessedElements = $(`${selector}:not([data-toblack-processed="true"])`);
+                log(`容器 ${selector}: 总数=${allElements.length}, 未处理=${unprocessedElements.length}`);
+
+                // 如果是.video-card，显示更多调试信息
+                if (selector === '.video-card' && allElements.length > 0) {
+                    log('  .video-card示例:');
+                    allElements.slice(0, 2).each((i, el) => {
+                        const $el = $(el);
+                        log(`    示例${i + 1}: class="${$el.attr('class')}", 内部是否有channel-name: ${$el.find('.channel-name').length}`);
+                        const channelLinks = $el.find('.channel-name');
+                        if (channelLinks.length > 0) {
+                            channelLinks.each((j, link) => {
+                                log(`      channel-name ${j + 1}: href="${$(link).attr('href')}", text="${$(link).text().trim()}"`);
+                            });
                         }
                     });
-                });
+                }
+            });
+
+            // 额外调试：检查是否有其他可能的BewlyBewly容器
+            const bewlyContainerSelectors = [
+                '.video-card', '.video-card.group', '[class*="video-card"]'
+            ];
+            log('=== BewlyBewly容器检查 ===');
+            bewlyContainerSelectors.forEach(selector => {
+                const elements = $(selector);
+                if (elements.length > 0) {
+                    log(`可能的BewlyBewly容器 ${selector}: ${elements.length}个`);
+                    // 只显示前3个元素的类名作为参考
+                    elements.slice(0, 3).each((i, el) => {
+                        log(`  示例${i + 1}: class="${$(el).attr('class')}" tag="${el.tagName}"`);
+                    });
+                }
+            });
+
+            possibleContainers.forEach(containerSelector => {
+                const cards = findInShadowDOM(`${containerSelector}:not([data-toblack-processed="true"])`);
+
+                if (cards.length > 0) {
+                    // log(`找到 ${cards.length} 个未处理的视频卡片 (${containerSelector})`); // 减少日志
+                    foundCards = true;
+
+                    cards.each((index, card) => {
+                        const $card = $(card);
+                        // 标记立即处理，避免重复
+                        $card.attr('data-toblack-processed', 'true');
+
+                        let ownerLinkElement = null;
+                        let upName = '';
+                        let ownerUrl = '';
+                        let uid = '';
+
+                        // 调试：记录正在处理的卡片信息
+                        log(`正在处理卡片 (${containerSelector}):`, $card[0]);
+
+                        // 优先使用新结构选择器
+                        ownerLinkElement = $card.find('a.bili-video-card__info--owner');
+                        if (ownerLinkElement.length > 0) {
+                            ownerUrl = ownerLinkElement.attr('href');
+                            const authorSpan = ownerLinkElement.find('span.bili-video-card__info--author');
+                            if (authorSpan.length > 0) {
+                                upName = authorSpan.attr('title') || authorSpan.text().trim(); // 优先用 title
+                            } else {
+                                // 备选：直接取链接文本，尝试去除日期
+                                upName = ownerLinkElement.text().trim().split('·')[0].trim();
+                            }
+                            log(`首页: 结构匹配成功 (a.bili-video-card__info--owner)`);
+                        } else {
+                            // 新增：检查插件修改布局中的 channel-name 结构
+                            const channelNameElement = $card.find('a.channel-name');
+                            if (channelNameElement.length > 0) {
+                                ownerLinkElement = channelNameElement;
+                                ownerUrl = channelNameElement.attr('href');
+                                // 在 channel-name 中提取名称，可能在嵌套的 span 中
+                                const nameSpans = channelNameElement.find('span span');
+                                if (nameSpans.length > 0) {
+                                    upName = nameSpans.last().text().trim();
+                                } else {
+                                    upName = channelNameElement.text().trim();
+                                }
+                                log(`首页: 插件布局结构匹配成功 (a.channel-name)`);
+                            } else {
+                                // Fallback 到旧的选择器逻辑
+                                const possibleOwnerSelectors = ['.up-name', '.author-text', '.up-name__text'];
+                                for (const selector of possibleOwnerSelectors) {
+                                    const element = $card.find(selector);
+                                    if (element.length > 0) {
+                                        ownerLinkElement = element; // 记录找到的元素
+                                        ownerUrl = element.attr('href');
+                                        upName = element.text().trim();
+                                        log(`首页: 备选结构匹配成功 (${selector})`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!ownerUrl || !ownerLinkElement) {
+                            log('❌ 未能找到卡片上的UP主链接，调试信息：');
+                            log('- ownerUrl:', ownerUrl);
+                            log('- ownerLinkElement:', ownerLinkElement);
+                            log('- 卡片HTML结构:', $card[0].outerHTML.substring(0, 500) + '...');
+
+                            // 额外调试：尝试找到卡片中所有的链接
+                            const allLinks = $card.find('a[href*="space"]');
+                            log('- 卡片中所有包含"space"的链接数量:', allLinks.length);
+                            allLinks.each((i, link) => {
+                                log(`  链接${i + 1}: href="${$(link).attr('href')}", text="${$(link).text().trim()}", class="${$(link).attr('class')}"`);
+                            });
+
+                            return; // Skip card
+                        }
+
+                        // 提取 UID (新增对 //space.bilibili.com/ 格式的支持)
+                        if (ownerUrl.includes('/space.bilibili.com/')) {
+                            uid = ownerUrl.split('/space.bilibili.com/')[1].split('?')[0].split('/')[0];
+                        } else if (ownerUrl.includes('//space.bilibili.com/')) {
+                            // 处理插件修改布局中的 //space.bilibili.com/ 格式
+                            uid = ownerUrl.split('//space.bilibili.com/')[1].split('?')[0].split('/')[0];
+                        } else if (ownerUrl.includes('/space/')) {
+                            uid = ownerUrl.split('/space/')[1].split('?')[0].split('/')[0];
+                        } else {
+                            const match = ownerUrl.match(/\/(\d+)(\/|\?|$)/);
+                            if (match && match[1]) { uid = match[1]; }
+                        }
+
+                        if (!uid || !/^\d+$/.test(uid)) {
+                            // log('无法从URL提取有效的首页UID:', ownerUrl);
+                            return; // Skip card
+                        }
+
+                        // 给卡片添加 data-up-id 属性，方便拉黑后移除
+                        $card.attr('data-up-id', uid);
+
+                        if (!upName) { upName = `UID: ${uid}`; } // Default name if extraction failed
+                        log('提取首页UID:', uid, '名称:', upName);
+
+                        // --- 按钮放置 ---
+                        let buttonAdded = false;
+
+
+
+                        // 新增：优先尝试插件布局的 channel-name 后面
+                        if (!buttonAdded && ownerLinkElement && ownerLinkElement.hasClass('channel-name')) {
+                            if (ownerLinkElement.next('.bilibili-blacklist-btn').length === 0) {
+                                const blackButton = $(`<a class="bilibili-blacklist-btn" data-uid="${uid}">拉黑</a>`);
+                                blackButton.on('click', function (e) { e.preventDefault(); e.stopPropagation(); window.tools_toblack(uid, upName); });
+                                ownerLinkElement.after(blackButton);
+                                buttonAdded = true;
+                                log('按钮添加到 channel-name 后面');
+                            } else { buttonAdded = true; /* Already exists */ }
+                        }
+
+                        // 原有逻辑：尝试添加到 info--bottom 的前面
+                        if (!buttonAdded) {
+                            const bottomInfoDiv = $card.find('.bili-video-card__info--bottom');
+                            if (bottomInfoDiv.length > 0) {
+                                if (bottomInfoDiv.find('.bilibili-blacklist-btn').length === 0) { // 避免重复添加
+                                    const blackButton = $(`<a class="bilibili-blacklist-btn" data-uid="${uid}">拉黑</a>`);
+                                    blackButton.on('click', function (e) { e.preventDefault(); e.stopPropagation(); window.tools_toblack(uid, upName); });
+                                    bottomInfoDiv.prepend(blackButton);
+                                    buttonAdded = true;
+                                    log('按钮添加到 info--bottom 前面');
+                                } else { buttonAdded = true; /* Already exists */ }
+                            }
+                        }
+
+                        // 备选：添加到卡片右上角悬浮 (如果上面没成功)
+                        if (!buttonAdded && $card.find('.blacklist-button-container').length === 0) {
+                            if (!$card.css('position') || $card.css('position') === 'static') {
+                                $card.css('position', 'relative'); //确保卡片有定位上下文
+                            }
+                            const container = $('<div class="blacklist-button-container"></div>');
+                            const blackButton = $(`<a class="bilibili-blacklist-btn" data-uid="${uid}">拉黑</a>`);
+                            blackButton.on('click', function (e) { e.preventDefault(); e.stopPropagation(); window.tools_toblack(uid, upName); });
+                            container.append(blackButton);
+                            $card.append(container);
+                            buttonAdded = true;
+                            log('按钮添加到悬浮容器');
+                        }
+
+                        // 旧的 UID class 逻辑，保留
+                        $card.addClass('uid_' + uid);
+                    });
+                }
+            });
+            // if (!foundCards) { log('本次未找到任何需要处理的视频卡片'); } // 减少日志
+        }
+
+
+        // === 处理视频页面 (保持不变, 使用 v1.0.7 的逻辑) ===
+        function processVideoPage() {
+            log('处理视频页面');
+
+            function findAndProcessUpInfo() {
+                // Target the container div first, ensure it's not already processed
+                const upnameDivs = $('div.upname:not([data-toblack-processed="true"])');
+
+                if (upnameDivs.length > 0) {
+                    log(`找到 ${upnameDivs.length} 个未处理的视频页UP主容器 (div.upname)`);
+
+                    upnameDivs.each(function () {
+                        const upnameDiv = $(this);
+                        // Find the main link (<a>) inside the div, which contains the space URL
+                        const linkElement = upnameDiv.find('a[href*="/space.bilibili.com/"], a[href*="/space/"]');
+                        // Find the name span (span.name) inside the link
+                        const nameElement = linkElement.find('span.name');
+
+                        if (linkElement.length > 0 && nameElement.length > 0) {
+                            if (linkElement.find('.bilibili-blacklist-btn').length > 0) {
+                                upnameDiv.attr('data-toblack-processed', 'true');
+                                // log('按钮已存在于 upname link 中，跳过'); //减少日志
+                                return;
+                            }
+                            const upUrl = linkElement.attr('href');
+                            const upName = nameElement.text().trim();
+                            if (!upUrl || !upName) { upnameDiv.attr('data-toblack-processed', 'true'); return; }
+                            let uid = '';
+                            if (upUrl.includes('/space.bilibili.com/')) { uid = upUrl.split('/space.bilibili.com/')[1].split('?')[0].split('/')[0]; }
+                            else if (upUrl.includes('/space/')) { uid = upUrl.split('/space/')[1].split('?')[0].split('/')[0]; }
+                            else { const match = upUrl.match(/\/(\d+)(\/|\?|$)/); if (match && match[1]) { uid = match[1]; } }
+                            if (!uid || !/^\d+$/.test(uid)) { upnameDiv.attr('data-toblack-processed', 'true'); return; }
+                            // ... (code to extract uid and upName) ...
+
+                            log('提取视频页UID:', uid, '名称:', upName);
+                            const blackButton = $(`<a class="bilibili-blacklist-btn" data-uid="${uid}">拉黑</a>`);
+
+                            // === MODIFIED CLICK HANDLER for Video Page ===
+                            blackButton.on('click', function (e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('[拉黑脚本] --- 视频页按钮点击事件触发 ---'); // Log: Handler Fired
+
+                                const buttonElement = $(this);
+                                // Re-read UID from the button's data attribute at the time of click
+                                const clickedUid = buttonElement.data('uid');
+                                // Use the name captured when the button was created (closure)
+                                // Alternatively, could try finding the name span again relative to buttonElement if needed
+                                const clickedName = upName;
+
+                                console.log('[拉黑脚本] 点击时获取的 UID:', clickedUid, typeof clickedUid);
+                                console.log('[拉黑脚本] 点击时获取的 Name:', clickedName);
+
+                                // Validate the UID before calling the API function
+                                if (!clickedUid || typeof clickedUid === 'undefined' || String(clickedUid).trim() === '' || !/^\d+$/.test(String(clickedUid))) {
+                                    console.error('[拉黑脚本] 错误：点击时 UID 无效!', clickedUid);
+                                    showToast('拉黑失败：无法获取有效的 UP 主 ID');
+                                    // Optionally add more specific error messages based on the condition
+                                    // if (!clickedUid) { showToast('拉黑失败：UID 未定义'); }
+                                    // else if (!/^\d+$/.test(String(clickedUid))) { showToast('拉黑失败：UID 非数字'); }
+                                    return; // Stop if UID is invalid
+                                }
+
+                                // If UID is valid, proceed to call the block function
+                                console.log('[拉黑脚本] UID 有效，准备调用 tools_toblack...');
+                                try {
+                                    window.tools_toblack(String(clickedUid), clickedName);
+                                } catch (apiError) {
+                                    console.error('[拉黑脚本] 调用 tools_toblack 时出错:', apiError);
+                                    showToast('拉黑操作内部出错，请检查控制台');
+                                }
+                            });
+                            // === END MODIFIED CLICK HANDLER ===
+
+                            nameElement.after(blackButton); // Insert button after the name span
+                            upnameDiv.attr('data-toblack-processed', 'true');
+                            log('已添加拉黑按钮到视频页UP主:', upName);
+                        } else { upnameDiv.attr('data-toblack-processed', 'true'); }
+                    });
+                    return true; // Found and processed elements
+                }
+                return false; // Did not find any new div.upname to process this time
             }
-        };
-    })();
 
-    const ObserverManager = (() => {
-        const observedNodes = new WeakSet();
+            // Retry logic (保持不变)
+            if (!findAndProcessUpInfo()) {
+                // log('首次未找到UP主信息 (div.upname)，将在稍后重试'); // Reduce log noise
+                let retryCount = 0; const maxRetries = 5; const retryInterval = 800;
+                if (window.videoPageRetryTimer) { clearInterval(window.videoPageRetryTimer); }
+                window.videoPageRetryTimer = setInterval(() => {
+                    retryCount++;
+                    if (findAndProcessUpInfo() || retryCount >= maxRetries) {
+                        clearInterval(window.videoPageRetryTimer); window.videoPageRetryTimer = null;
+                        if (retryCount >= maxRetries && !$('div.upname .bilibili-blacklist-btn').length) { log('在多次尝试后仍未找到或添加按钮到 UP主信息 (div.upname)'); }
+                        else if ($('div.upname .bilibili-blacklist-btn').length > 0) { log(`通过重试找到并处理了 UP 主信息`); }
+                    }
+                }, retryInterval);
+            }
+        }
 
-        function observe(node) {
-            if (!node || observedNodes.has(node)) { return; }
+
+        // 统一处理入口 (保持不变)
+        function processPage() {
+            if (window.processingPage) { return; } // 简化跳过逻辑
+            window.processingPage = true;
             try {
-                const observer = new MutationObserver((mutations) => {
-                    MUTATION_PIPELINE.dispatch(mutations);
-                });
-                observer.observe(node, { childList: true, subtree: true });
-                observedNodes.add(node);
-                log('已监听节点变化:', node.nodeName || node);
+                const isVideoPage = window.location.href.includes('/video/');
+                if (isVideoPage) { processVideoPage(); } else { processHomePage(); }
             } catch (error) {
-                log('监听节点失败', error);
+                log("处理页面时出错:", error);
+            } finally {
+                // 使用 setTimeout 确保 processingPage 标志在稍后重置
+                setTimeout(() => { window.processingPage = false; }, 300); // 减少延迟
             }
         }
 
-        return {
-            init() {
-                observe(document.documentElement);
-                observe(document.body);
-                onShadowRootDiscovered((root) => observe(root));
-            }
-        };
-    })();
 
-    function detectPageType(url = window.location.href) {
-        let parsed;
-        try { parsed = new URL(url, window.location.origin); } catch (error) { return 'feed'; }
-        const { hostname, pathname } = parsed;
-        if (hostname.startsWith('search.')) { return 'search'; }
-        if (pathname.startsWith('/video/')) { return 'video'; }
-        return 'feed';
-    }
+        // === 设置DOM观察器 (已修改首页目标) ===
+        function setupObserver() {
+            if (window.blacklistObserverSet) { log('观察器已存在，跳过设置'); return; }
+            log('设置DOM观察器');
 
-    const LocationWatcher = (() => {
-        const listeners = new Set();
-        let lastHref = window.location.href;
+            // --- Debounce 处理函数 ---
+            const debouncedProcessPage = debounce(processPage, 300);
+            // ---
 
-        function notify() {
-            const current = window.location.href;
-            if (current === lastHref) { return; }
-            const previous = lastHref;
-            lastHref = current;
-            listeners.forEach((listener) => {
-                try { listener(current, previous); } catch (error) { log('Location listener error', error); }
+            const observer = new MutationObserver(function (mutations) {
+                // 每当DOM变化，都尝试注入样式，并重新处理页面
+                injectStylesIntoShadowDOMs(BILI_BLACKLIST_STYLES);
+                debouncedProcessPage();
             });
-        }
 
-        window.addEventListener('popstate', () => window.queueMicrotask(notify));
-        window.addEventListener('hashchange', () => window.queueMicrotask(notify));
+            const isVideoPage = window.location.href.includes('/video/');
+            const isSearchPage = window.location.href.includes('search.bilibili.com');
+            let targetNode = null;
 
-        const originalPushState = history.pushState;
-        if (typeof originalPushState === 'function') {
-            history.pushState = function (...args) {
-                const result = originalPushState.apply(this, args);
-                window.queueMicrotask(notify);
-                return result;
-            };
-        }
-        const originalReplaceState = history.replaceState;
-        if (typeof originalReplaceState === 'function') {
-            history.replaceState = function (...args) {
-                const result = originalReplaceState.apply(this, args);
-                window.queueMicrotask(notify);
-                return result;
-            };
-        }
-
-        return {
-            add(listener) { listeners.add(listener); },
-            remove(listener) { listeners.delete(listener); }
-        };
-    })();
-
-    function createBlacklistButton({ uid, upName, pageType, card }) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'bilibili-blacklist-btn';
-        button.textContent = '拉黑';
-        button.dataset.uid = uid;
-
-        const entry = { uid, upName, button, pageType, card, originalText: '拉黑' };
-        buttonEntryMap.set(button, entry);
-        buttonRegistry.register(uid, entry);
-
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleBlockRequest(uid, upName, button);
-        });
-
-        return button;
-    }
-
-    function setButtonLoading(button, isLoading, text = '处理中...') {
-        if (!button) { return; }
-        if (isLoading) {
-            button.dataset.state = 'loading';
-            button.disabled = true;
-            button.textContent = text;
-        } else if (button.dataset.state === 'loading') {
-            const entry = buttonEntryMap.get(button);
-            button.textContent = (entry && entry.originalText) || '拉黑';
-            button.disabled = false;
-            button.dataset.state = '';
-            button.removeAttribute('data-state');
-        }
-    }
-
-    async function handleBlockRequest(uid, upName, button) {
-        const entry = buttonEntryMap.get(button);
-        if (!entry) { return; }
-        if (button.dataset.state === 'loading' || button.dataset.state === 'blocked') {
-            return;
-        }
-        const csrfToken = getCsrfToken();
-        if (!csrfToken) {
-            BiliToast.show('请先登录B站账号后再使用一键拉黑功能', { type: 'warning', duration: 4000 });
-            return;
-        }
-
-        setButtonLoading(button, true);
-        try {
-            const result = await blockUser(uid, csrfToken);
-            if (result.code === 22120) {
-                BiliToast.show('该用户已在黑名单中', { type: 'info' });
+            if (isVideoPage) {
+                // 视频页目标 (保持 v1.0.7 的选择)
+                targetNode = document.querySelector('#viewbox_report') ||
+                    document.querySelector('.video-info-detail') ||
+                    document.querySelector('#app .left-container');
+                log('尝试为视频页选择观察节点:', targetNode ? (targetNode.id || targetNode.className) : '未找到特定节点');
+            } else if (isSearchPage) {
+                // 搜索页面目标: 添加搜索结果特定的选择器
+                targetNode = document.querySelector('.video-list') ||        // 搜索结果视频列表
+                    document.querySelector('.search-content') ||    // 搜索内容区域
+                    document.querySelector('.search-page') ||       // 搜索页面容器
+                    document.querySelector('#app .bili-grid') ||    // 通用网格布局
+                    document.querySelector('#app .bili-layout') ||  // 更通用的布局容器
+                    document.querySelector('#app');                 // 万不得已才用 #app
+                log('尝试为搜索页面选择观察节点:', targetNode ? (targetNode.id || targetNode.className) : '未找到特定节点');
             } else {
-                BiliToast.show(`已成功将 “${upName || 'UP主'}” 加入黑名单`, { type: 'success' });
+                // 首页目标: 优先尝试包含BewlyBewly video-card的容器
+                targetNode = document.querySelector('[data-v-89bbbbc2]') ||  // BewlyBewly的数据属性容器
+                    document.querySelector('#app .feed-list') ||             // 推荐流
+                    document.querySelector('#i_cecream') ||                  // 首页外层容器 ID 之一
+                    document.querySelector('.bili-grid') ||                  // 通用网格布局
+                    document.querySelector('#app .bili-layout') ||           // 更通用的布局容器
+                    document.querySelector('#app');                          // 万不得已才用 #app
+                log('尝试为首页选择观察节点:', targetNode ? (targetNode.id || targetNode.className || targetNode.tagName) : '未找到特定节点');
             }
-            buttonRegistry.markBlocked(uid);
-            updateBlacklistCount(true);
-        } catch (error) {
-            log('拉黑请求失败', error);
-            BiliToast.show(error.userMessage || '拉黑请求失败，请检查网络或登录状态', { type: 'error', duration: 4000 });
-            setButtonLoading(button, false);
-        }
-    }
 
-    function findOwnerInfoInCard(card) {
-        if (!card) { return null; }
-        const ownerLink = card.querySelector('a.bili-video-card__info--owner')
-            || card.querySelector('.upname a[href*="space"]')
-            || card.querySelector('a.channel-name')
-            || card.querySelector('a[href*="//space.bilibili.com/"]')
-            || card.querySelector('a[href*="/space/"]');
-
-        if (!ownerLink) { return null; }
-        const uid = extractUidFromUrl(ownerLink.getAttribute('href'));
-        if (!uid) { return null; }
-        const nameSource = ownerLink.querySelector('[title]') || ownerLink;
-        const upName = sanitizeText(nameSource.getAttribute('title') || nameSource.textContent) || `UID ${uid}`;
-        return { uid, upName, anchor: ownerLink };
-    }
-
-    function placeButtonInCard(card, button, ownerInfo) {
-        if (!card || !button) { return false; }
-
-        const existing = card.querySelector(`.bilibili-blacklist-btn[data-uid="${ownerInfo.uid}"]`);
-        if (existing) { return false; }
-
-        if (ownerInfo.anchor && ownerInfo.anchor.parentElement) {
-            ownerInfo.anchor.insertAdjacentElement('afterend', button);
-            return true;
-        }
-
-        const infoBottom = card.querySelector('.bili-video-card__info--bottom');
-        if (infoBottom) {
-            infoBottom.insertAdjacentElement('afterbegin', button);
-            return true;
-        }
-
-        if (!card.style.position || card.style.position === 'static') {
-            card.style.position = 'relative';
-        }
-        let container = card.querySelector('.blacklist-button-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'blacklist-button-container';
-            card.appendChild(container);
-        }
-        container.appendChild(button);
-        return true;
-    }
-
-    function processFeedCard(card, pageType) {
-        if (!card || card.dataset.blacklistProcessed === 'true') { return; }
-        const ownerInfo = findOwnerInfoInCard(card);
-        if (!ownerInfo) { return; }
-        const button = createBlacklistButton({ uid: ownerInfo.uid, upName: ownerInfo.upName, pageType, card });
-        const placed = placeButtonInCard(card, button, ownerInfo);
-        if (placed) {
-            card.dataset.blacklistProcessed = 'true';
-            card.dataset.upId = ownerInfo.uid;
-            log(`已为${pageType}卡片添加按钮`, ownerInfo.uid, ownerInfo.upName);
-        }
-    }
-
-    function processVideoContainer(container) {
-        if (!container || container.dataset.blacklistProcessed === 'true') { return; }
-        const ownerLink = container.querySelector('a[href*="//space.bilibili.com/"]')
-            || container.querySelector('a[href*="/space/"]');
-        if (!ownerLink) { return; }
-        const uid = extractUidFromUrl(ownerLink.getAttribute('href'));
-        if (!uid) { return; }
-        const nameNode = container.querySelector('.name') || ownerLink.querySelector('.name') || ownerLink;
-        const upName = sanitizeText(nameNode.textContent) || `UID ${uid}`;
-        if (container.querySelector(`.bilibili-blacklist-btn[data-uid="${uid}"]`)) {
-            container.dataset.blacklistProcessed = 'true';
-            return;
-        }
-        const button = createBlacklistButton({ uid, upName, pageType: 'video', card: container });
-        if (nameNode && nameNode.parentElement) {
-            nameNode.insertAdjacentElement('afterend', button);
-        } else {
-            ownerLink.insertAdjacentElement('afterend', button);
-        }
-        container.dataset.blacklistProcessed = 'true';
-        log('已为视频页UP主添加按钮', uid, upName);
-    }
-
-    function createFeedLikeHandler(pageType, selector) {
-        const selectorString = selector;
-        const selectors = selector.split(',').map((s) => s.trim()).filter(Boolean);
-
-        function matches(element) {
-            return selectors.some((sel) => {
-                try { return element.matches(sel); } catch (error) { return false; }
-            });
-        }
-
-        function locateCard(element) {
-            for (const sel of selectors) {
-                try {
-                    const match = element.closest(sel);
-                    if (match) { return match; }
-                } catch (error) {
-                    // ignore invalid selector on closest
-                }
+            // 最终备选：如果找不到任何特定节点，就观察body
+            if (!targetNode) {
+                targetNode = document.body;
+                log('警告：未找到特定观察节点，将观察整个 body');
             }
-            return null;
+
+            if (targetNode) {
+                log('最终选择观察节点:', targetNode);
+                observer.observe(targetNode, { childList: true, subtree: true });
+                window.blacklistObserverSet = true;
+                log('DOM观察器已启动');
+            } else {
+                log('警告：未能找到合适的DOM节点进行观察，MutationObserver 未启动。按钮可能只在初始加载时添加。');
+            }
+
+            // 初始加载时检查 (总会执行一次)
+            injectStylesIntoShadowDOMs(BILI_BLACKLIST_STYLES); // 首次注入
+            setTimeout(processPage, 1500);
+
+            // BewlyBewly可能需要更长加载时间，增加延迟重试
+            setTimeout(() => {
+                log('=== 延迟重试检查 (为BewlyBewly) ===');
+                processPage();
+            }, 3000);
+
+            setTimeout(() => {
+                log('=== 最后一次重试检查 ===');
+                processPage();
+            }, 5000);
+
+            // 定期检查作为后备 (可选，可以注释掉)
+            // if (window.blacklistInterval) clearInterval(window.blacklistInterval);
+            // window.blacklistInterval = setInterval(processPage, 10000);
         }
 
-        function collectCardsFromNode(node, collector) {
-            if (node instanceof Element) {
-                if (matches(node)) {
-                    const card = locateCard(node) || node;
-                    collector.add(card);
-                }
-                node.querySelectorAll(selectorString).forEach((el) => collector.add(el));
-            } else if (node instanceof DocumentFragment) {
-                node.querySelectorAll(selectorString).forEach((el) => collector.add(el));
-            }
-        }
 
-        return {
-            init() {},
-            teardown() {},
-            processExisting(root = document) {
-                root.querySelectorAll(selectorString).forEach((card) => processFeedCard(card, pageType));
-            },
-            handleMutations(mutations) {
-                const cards = new Set();
-                mutations.forEach((mutation) => {
-                    mutation.addedNodes.forEach((node) => collectCardsFromNode(node, cards));
-                });
-                cards.forEach((card) => processFeedCard(card, pageType));
-            }
-        };
-    }
+        // 暴露给全局作用域 (保持不变)
+        window.blacklistScript = { processPage, processHomePage, processVideoPage };
 
-    function createVideoHandler() {
-        function collectContainersFromNode(node, collector) {
-            if (node instanceof Element) {
-                if (node.matches(VIDEO_OWNER_SELECTOR)) {
-                    collector.add(node);
-                }
-                node.querySelectorAll(VIDEO_OWNER_SELECTOR).forEach((el) => collector.add(el));
-            } else if (node instanceof DocumentFragment) {
-                node.querySelectorAll(VIDEO_OWNER_SELECTOR).forEach((el) => collector.add(el));
-            }
-        }
-
-        return {
-            init() {},
-            teardown() {},
-            processExisting(root = document) {
-                root.querySelectorAll(VIDEO_OWNER_SELECTOR).forEach(processVideoContainer);
-            },
-            handleMutations(mutations) {
-                const containers = new Set();
-                mutations.forEach((mutation) => {
-                    mutation.addedNodes.forEach((node) => collectContainersFromNode(node, containers));
-                });
-                containers.forEach(processVideoContainer);
-            }
-        };
-    }
-
-    const PageHandlers = {
-        feed: createFeedLikeHandler('feed', FEED_CARD_SELECTOR),
-        search: createFeedLikeHandler('search', SEARCH_CARD_SELECTOR),
-        video: createVideoHandler()
-    };
-
-    const PageManager = (() => {
-        let currentType = detectPageType();
-        let currentHandler = PageHandlers[currentType] || PageHandlers.feed;
-        currentHandler.init();
-
-        function handleMutations(mutations) {
-            currentHandler && currentHandler.handleMutations && currentHandler.handleMutations(mutations);
-        }
-
-        MUTATION_PIPELINE.add((mutations) => StyleManager.handleMutations(mutations));
-        MUTATION_PIPELINE.add(handleMutations);
-
-        LocationWatcher.add(() => {
-            const nextType = detectPageType();
-            if (nextType === currentType) { return; }
-            log(`页面类型变化: ${currentType} -> ${nextType}`);
-            currentHandler && currentHandler.teardown && currentHandler.teardown();
-            currentType = nextType;
-            currentHandler = PageHandlers[currentType] || PageHandlers.feed;
-            currentHandler.init();
-            currentHandler.processExisting(document);
+        // 启动逻辑 (保持不变)
+        $(document).ready(function () {
+            log('页面就绪，初始化脚本');
+            setupObserver();
+            updateBlacklistCount();
         });
 
-        return {
-            processExisting(root) {
-                currentHandler && currentHandler.processExisting && currentHandler.processExisting(root);
+        // 后备启动逻辑 (保持不变)
+        setTimeout(function () {
+            if (!window.blacklistObserverSet && !$('body').data('blacklist-init-fallback')) {
+                log('延时后备初始化');
+                $('body').data('blacklist-init-fallback', true);
+                setupObserver();
+                updateBlacklistCount();
+                processPage();
             }
-        };
-    })();
+        }, 3000);
 
-    function onReady(callback) {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', callback, { once: true });
-        } else {
-            callback();
-        }
-    }
-
-    onReady(() => {
-        log('脚本初始化开始');
-        StyleManager.init();
-        ObserverManager.init();
-        PageManager.processExisting(document);
-        updateBlacklistCount(true);
-        window.blacklistScript = {
-            refresh() {
-                PageManager.processExisting(document);
-            }
-        };
         log('脚本初始化完成');
     });
 })();
