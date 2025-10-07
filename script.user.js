@@ -6,7 +6,7 @@
 // @match        https://www.bilibili.com/video/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.1.9
+// @version      1.2.0
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_addStyle
@@ -163,10 +163,18 @@
     `;
 
     // 调试功能
-    const DEBUG = true;
+    let DEBUG = false;
+    try {
+        DEBUG = window.localStorage && window.localStorage.getItem("BILIBILI_BLACKLIST_DEBUG") === "true";
+    } catch (error) {
+        DEBUG = false;
+    }
+    if (!DEBUG && typeof window !== "undefined" && window.BILIBILI_BLACKLIST_DEBUG === true) {
+        DEBUG = true;
+    }
     function log(...args) {
         if (DEBUG) {
-            console.log('[拉黑脚本]', ...args);
+            console.log("[拉黑脚本]", ...args);
         }
     }
 
@@ -207,16 +215,165 @@
 
         // 2. 注入到 Shadow DOM
         const injectedShadowHosts = new WeakSet();
-        function injectStylesIntoShadowDOMs(css) {
-            document.querySelectorAll('*').forEach(el => {
-                if (el.shadowRoot && !injectedShadowHosts.has(el)) {
-                    const style = document.createElement('style');
-                    style.textContent = css;
-                    el.shadowRoot.appendChild(style);
-                    injectedShadowHosts.add(el);
-                    log(`[Shadow DOM] Styles injected into:`, el);
+        const shadowRootRegistry = new Set();
+        const shadowInjectionQueue = new Set();
+        let shadowInjectionScheduled = false;
+        let shadowInjectionTaskId = null;
+
+        function scheduleShadowInjectionProcessor() {
+            if (shadowInjectionScheduled || shadowInjectionQueue.size === 0) {
+                return;
+            }
+            shadowInjectionScheduled = true;
+            const processor = window.requestIdleCallback || window.requestAnimationFrame;
+            if (processor) {
+                shadowInjectionTaskId = processor(processShadowInjectionQueue);
+            } else {
+                shadowInjectionTaskId = window.setTimeout(() => processShadowInjectionQueue(), 16);
+            }
+        }
+
+        function processShadowInjectionQueue(deadline) {
+            shadowInjectionScheduled = false;
+            shadowInjectionTaskId = null;
+
+            const pending = Array.from(shadowInjectionQueue);
+            shadowInjectionQueue.clear();
+
+            const canYield = typeof deadline === "object" && typeof deadline.timeRemaining === "function";
+
+            for (let i = 0; i < pending.length; i++) {
+                processShadowCandidates(pending[i]);
+                if (canYield && deadline.timeRemaining() <= 0) {
+                    for (let j = i + 1; j < pending.length; j++) {
+                        shadowInjectionQueue.add(pending[j]);
+                    }
+                    scheduleShadowInjectionProcessor();
+                    break;
                 }
-            });
+            }
+        }
+
+        function processShadowInjectionQueueImmediately() {
+            if (shadowInjectionScheduled) {
+                if (typeof window.cancelIdleCallback === "function" && shadowInjectionTaskId !== null) {
+                    window.cancelIdleCallback(shadowInjectionTaskId);
+                } else if (shadowInjectionTaskId !== null) {
+                    window.clearTimeout(shadowInjectionTaskId);
+                }
+                shadowInjectionScheduled = false;
+                shadowInjectionTaskId = null;
+            }
+            if (shadowInjectionQueue.size === 0) {
+                return;
+            }
+            const pending = Array.from(shadowInjectionQueue);
+            shadowInjectionQueue.clear();
+            pending.forEach(node => processShadowCandidates(node));
+        }
+
+        function ensureShadowStyle(host) {
+            if (!host || !host.shadowRoot) {
+                return;
+            }
+
+            if (!host.shadowRoot.querySelector("style[data-bilibili-blacklist-style=\"true\"]")) {
+                const style = document.createElement("style");
+                style.setAttribute("data-bilibili-blacklist-style", "true");
+                style.textContent = BILI_BLACKLIST_STYLES;
+                host.shadowRoot.appendChild(style);
+                log("[Shadow DOM] Styles injected into:", host);
+            }
+
+            injectedShadowHosts.add(host);
+            shadowRootRegistry.add(host.shadowRoot);
+        }
+
+        function processShadowCandidates(root) {
+            if (!root) {
+                return;
+            }
+
+            const stack = [];
+
+            if (root === document || root === document.body) {
+                if (document.documentElement) {
+                    stack.push(document.documentElement);
+                }
+            } else if (root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                for (let i = 0; i < root.childNodes.length; i++) {
+                    const fragmentChild = root.childNodes[i];
+                    if (fragmentChild.nodeType === Node.ELEMENT_NODE) {
+                        stack.push(fragmentChild);
+                    }
+                }
+            } else if (root.nodeType === Node.ELEMENT_NODE) {
+                stack.push(root);
+            }
+
+            while (stack.length > 0) {
+                const current = stack.pop();
+                if (!current || current.nodeType !== Node.ELEMENT_NODE) {
+                    continue;
+                }
+
+                if (current.shadowRoot && !injectedShadowHosts.has(current)) {
+                    ensureShadowStyle(current);
+                } else if (current.shadowRoot) {
+                    shadowRootRegistry.add(current.shadowRoot);
+                }
+
+                const children = current.children;
+                for (let i = 0; i < children.length; i++) {
+                    stack.push(children[i]);
+                }
+            }
+        }
+
+        function queueShadowInjection(root) {
+            if (!root) {
+                return;
+            }
+
+            if (Array.isArray(root) ||
+                (typeof NodeList !== "undefined" && NodeList.prototype.isPrototypeOf(root)) ||
+                (typeof HTMLCollection !== "undefined" && HTMLCollection.prototype.isPrototypeOf(root))) {
+                Array.from(root).forEach(node => queueShadowInjection(node));
+                return;
+            }
+
+            if (root === document) {
+                root = document.documentElement;
+            }
+
+            if (!root) {
+                return;
+            }
+
+            shadowInjectionQueue.add(root);
+            scheduleShadowInjectionProcessor();
+        }
+
+        function injectStylesIntoShadowDOMs(css, roots) {
+            if (css !== BILI_BLACKLIST_STYLES) {
+                return;
+            }
+
+            if (typeof roots === "undefined") {
+                queueShadowInjection(document.documentElement);
+                if (shadowRootRegistry.size === 0) {
+                    processShadowInjectionQueueImmediately();
+                }
+                return;
+            }
+
+            if (Array.isArray(roots) ||
+                (typeof NodeList !== "undefined" && NodeList.prototype.isPrototypeOf(roots)) ||
+                (typeof HTMLCollection !== "undefined" && HTMLCollection.prototype.isPrototypeOf(roots))) {
+                Array.from(roots).forEach(node => queueShadowInjection(node));
+            } else {
+                queueShadowInjection(roots);
+            }
         }
         // ---
 
@@ -364,19 +521,24 @@
         // --- 新增：Shadow DOM 搜索函数 ---
         function findInShadowDOM(selector) {
             let results = $(selector);
-            // 遍历所有元素，检查是否有 shadowRoot
-            log('  [Shadow DOM] 开始搜索...');
-            $('*').each(function (index, el) {
-                if (this.shadowRoot) {
-                    log(`  [Shadow DOM] 在元素 ${el.tagName}.${el.className} 中找到 shadowRoot`);
-                    const shadowResults = $(this.shadowRoot).find(selector);
-                    if (shadowResults.length > 0) {
-                        log(`    [Shadow DOM] 找到 ${shadowResults.length} 个匹配 "${selector}" 的元素`);
-                        results = results.add(shadowResults);
-                    }
+
+            if (shadowRootRegistry.size === 0 && shadowInjectionQueue.size === 0) {
+                queueShadowInjection(document.documentElement);
+                processShadowInjectionQueueImmediately();
+            } else if (shadowRootRegistry.size === 0) {
+                processShadowInjectionQueueImmediately();
+            }
+
+            shadowRootRegistry.forEach(shadowRoot => {
+                if (!shadowRoot) {
+                    return;
+                }
+                const matches = shadowRoot.querySelectorAll(selector);
+                if (matches.length > 0) {
+                    results = results.add(matches);
                 }
             });
-            log(`  [Shadow DOM] 搜索结束，共找到 ${results.length} 个结果`);
+
             return results;
         }
 
@@ -717,8 +879,24 @@
             // ---
 
             const observer = new MutationObserver(function (mutations) {
-                // 每当DOM变化，都尝试注入样式，并重新处理页面
-                injectStylesIntoShadowDOMs(BILI_BLACKLIST_STYLES);
+                const shadowCandidates = [];
+
+                mutations.forEach(mutation => {
+                    if (mutation.type === "childList") {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                                shadowCandidates.push(node);
+                            }
+                        });
+                    } else if (mutation.type === "attributes" && mutation.target && mutation.target.shadowRoot) {
+                        shadowCandidates.push(mutation.target);
+                    }
+                });
+
+                if (shadowCandidates.length > 0) {
+                    injectStylesIntoShadowDOMs(BILI_BLACKLIST_STYLES, shadowCandidates);
+                }
+
                 debouncedProcessPage();
             });
 
