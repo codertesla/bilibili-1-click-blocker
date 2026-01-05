@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         B站一键拉黑UP主
-// @description  在B站首页、视频页和搜索页添加拉黑按钮，一键拉黑UP主。完整支持BewlyBewly插件首页布局适配。
+// @description  在B站首页、视频页和搜索页添加拉黑按钮，一键拉黑UP主。完整支持BewlyBewly插件首页布局适配。新增首页隐藏直播卡片功能。
 // @match        https://bilibili.com/
 // @match        https://www.bilibili.com/*
 // @match        https://www.bilibili.com/video/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.2.0
+// @version      1.2.1
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @grant        GM_addStyle
 // @namespace    https://github.com/codertesla/bilibili-1-click-blocker
 // @author       codertesla
@@ -159,6 +161,11 @@
 
         .group\\/desc:hover .blacklist-button-container {
           opacity: 1 !important;
+        }
+
+        /* --- 隐藏直播卡片样式 --- */
+        body.hide-live-cards .floor-single-card:has(.floor-title) {
+            display: none !important;
         }
     `;
 
@@ -419,6 +426,40 @@
             };
             return ctl;
         };
+
+        // --- 隐藏直播卡片设置 ---
+        let hideLiveCards = GM_getValue('hideLiveCards', false);
+        let hideLiveMenuId = null;
+
+        function updateHideLiveCardsUI() {
+            if (hideLiveCards) {
+                document.body.classList.add('hide-live-cards');
+            } else {
+                document.body.classList.remove('hide-live-cards');
+            }
+        }
+
+        function registerHideLiveMenu() {
+            const menuText = hideLiveCards ? '✓ 首页隐藏直播卡片（已开启）' : '○ 首页隐藏直播卡片（已关闭）';
+            try {
+                hideLiveMenuId = GM_registerMenuCommand(menuText, () => {
+                    hideLiveCards = !hideLiveCards;
+                    GM_setValue('hideLiveCards', hideLiveCards);
+                    updateHideLiveCardsUI();
+                    // 重新注册菜单以更新状态
+                    if (hideLiveMenuId !== null) {
+                        try { GM_unregisterMenuCommand(hideLiveMenuId); } catch (e) { log('解除直播菜单失败:', e); }
+                    }
+                    registerHideLiveMenu();
+                    showToast(hideLiveCards ? '已开启隐藏直播卡片' : '已关闭隐藏直播卡片');
+                });
+                log('注册隐藏直播菜单成功:', menuText);
+            } catch (e) { log('注册隐藏直播菜单失败:', e); }
+        }
+
+        // 初始化隐藏直播卡片设置
+        updateHideLiveCardsUI();
+        registerHideLiveMenu();
         const menu = menuctl({ initValue: 0 });
 
         // 显示自定义提示框 (保持不变)
