@@ -589,27 +589,29 @@
         // === 新增：移除广告卡片函数 ===
         function removeAdCards() {
             if (!blockAdCards) return;
-            // 查找包含“广告”文本的 stats 标记
-            // 目标选择器：.bili-video-card__stats--text 且内容为 "广告"
-            // 或者 .bili-video-card__info--text-ad
             
+            // 1. 查找包含“广告”文本的 stats 标记 (首页常见)
             const adTexts = findInShadowDOM('.bili-video-card__stats--text, .bili-video-card__info--text-ad');
-            
             adTexts.each(function() {
                 const $text = $(this);
                 if ($text.text().trim() === '广告') {
-                    // 找到了广告标记，向上寻找卡片容器
                     const $card = $text.closest('.feed-card, .bili-video-card, .video-card, .floor-single-card');
                     if ($card.length > 0) {
-                       log('检测到广告卡片，准备移除:', $card[0]);
+                       log('检测到广告卡片 (文本匹配)，准备移除:', $card[0]);
                        $card.remove();
-                       // $card.css('border', '5px solid red'); // 调试用
                     }
                 }
             });
-            
-            // 针对特定结构的额外检查 (如 user request 中的 HTML)
-            // <div class="bili-video-card__stats"><span class="bili-video-card__stats--text">广告</span></div>
+
+            // 2. 移除特定的广告元素 (视频页右上角等)
+            const specificAdSelectors = '#slide_ad, .video-card-ad-small';
+            const specificAds = findInShadowDOM(specificAdSelectors);
+            if (specificAds.length > 0) {
+                specificAds.each(function() {
+                    log('检测到特定广告元素 (Selector匹配)，准备移除:', this);
+                    $(this).remove();
+                });
+            }
         }
 
         // --- 新增：Shadow DOM 搜索函数 ---
@@ -855,6 +857,11 @@
         // === 处理视频页面 (保持不变, 使用 v1.0.7 的逻辑) ===
         function processVideoPage() {
             log('处理视频页面');
+
+            // 执行广告移除
+            if (blockAdCards) {
+                removeAdCards();
+            }
 
             function findAndProcessUpInfo() {
                 // Target the container div first, ensure it's not already processed
