@@ -6,7 +6,7 @@
 
 为哔哩哔哩（Bilibili）设计的极简、高效的一键拉黑工具。彻底杜绝不想看到的 UP 主，还你一个清爽的冲浪环境。
 
----
+
 
 ## ✨ 核心特性
 
@@ -21,7 +21,7 @@
   - 直接对接 **B站官方黑名单**，操作即刻生效，黑名单上限由 B站账号等级决定。
   - **操作回馈**：友好的 Toast 提示，拉黑成功一目了然。
 
----
+
 
 ## 🛠️ 安装指南
 
@@ -32,7 +32,6 @@
    - 👉 [**安装 B站一键拉黑脚本**](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 3. **刷新 页面** 即可立即生效。
 
----
 
 ## 📸 效果展示
 
@@ -40,7 +39,6 @@
 | :--- | :--- |
 | ![首页示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/homepage.avif) | ![视频页示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/videopage.avif) |
 
----
 
 ## ⚙️ 菜单配置
 
@@ -52,7 +50,7 @@
 > [!TIP]
 > 觉得首页还是太乱？尝试打开脚本的 **隐藏直播卡片** 和 **屏蔽广告卡片** 功能，还你一个清爽的首页！
 
----
+
 
 ## ⚠️ 注意事项
 
@@ -64,7 +62,7 @@
 > [!CAUTION]
 > **关于 BewlyBewly 插件**：本脚本**不兼容** [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly) 插件。由于 BewlyBewly 对 B 站页面进行了大量 DOM 结构修改，适配难度较高，且开发者本地环境无法正常运行 BewlyBewly 进行测试，故已放弃适配。如果你正在使用 BewlyBewly，本脚本可能无法正常工作，敬请谅解。
 
----
+
 
 ## ❓ 常见问题
 
@@ -83,7 +81,7 @@ A: 在脚本菜单点击“去管理黑名单”，或者直接访问 B站官方
 A: 脚本通过匹配“广告”标识来屏蔽。对于某些绕过标识的特殊推广，欢迎反馈，我们会持续更新过滤规则。
 </details>
 
----
+
 
 ## 📜 更新日志
 
@@ -95,14 +93,14 @@ A: 脚本通过匹配“广告”标识来屏蔽。对于某些绕过标识的�
 - **v1.1.4** (2025-03-11)：新增对 **B站搜索结果页面** 的支持。
 - **v1.0.0** (2025-03-10)：初始版本发布，核心拉黑功能实现。
 
----
+
 
 ## 🤝 贡献与反馈
 
 - **提交 BUG / 建议**：[GitHub Issues](https://github.com/codertesla/bilibili-1-click-blocker/issues) 或 [Greasy Fork 反馈区](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主/feedback)
 - **致谢**：项目灵感源自 Greasy Fork 脚本 ID 526549，在此基础上进行了大量的修复与功能扩展。
 
----
+
 
 **免责声明**：本脚本仅供学习和个人使用。使用本脚本产生的任何后果由用户自行承担。
 
