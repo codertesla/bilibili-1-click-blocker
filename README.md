@@ -1,4 +1,4 @@
-# 🚫 Bilibili 1-Click Blocker (B站一键拉黑)
+# 🚫 Bilibili 1-Click Blocker (B站一键拉黑UP主)
 
 [![安装脚本](https://img.shields.io/badge/安装脚本-Greasy%20Fork-red.svg?style=for-the-badge&logo=tampermonkey)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 [![GitHub](https://img.shields.io/badge/GitHub-仓库-blue.svg?style=for-the-badge&logo=github)](https://github.com/codertesla/bilibili-1-click-blocker)
@@ -29,7 +29,7 @@
    - [Tampermonkey](https://www.tampermonkey.net/) (推荐)
    - [Violentmonkey](https://violentmonkey.github.io/)
 2. **点此一键安装**：
-   - 👉 [**安装 B站一键拉黑脚本**](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
+   - 👉 [**安装 B站一键拉黑UP主脚本**](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 3. **刷新 页面** 即可立即生效。
 
 
