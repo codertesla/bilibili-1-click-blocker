@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.1';
+    const VERSION = '1.3.3';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
