@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.0
+// @version      1.3.1
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.0';
+    const VERSION = '1.3.1';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -141,6 +141,15 @@
           margin-right: 0 !important;
           font-size: 10px !important;
           padding: 0px 4px !important;
+        }
+        .up-detail-top > .bilibili-blacklist-btn.video-upinfo-blacklist-btn {
+          flex: 0 0 auto !important;
+          margin-left: 8px !important;
+          margin-right: 8px !important;
+          font-size: 11px !important;
+          padding: 1px 5px !important;
+          line-height: normal !important;
+          align-self: center !important;
         }
 
         /* 卡片悬浮按钮 (备选放置方式) */
@@ -650,10 +659,36 @@
     let videoPageRetryTimer = null;
 
     function findAndProcessVideoUp() {
-        const upnameDivs = document.querySelectorAll('div.upname:not([data-toblack-processed])');
-        if (upnameDivs.length === 0) return false;
-
         let added = false;
+
+        document.querySelectorAll('.up-info-container:not([data-toblack-processed])').forEach(container => {
+            const link = container.querySelector('.up-detail-top a.up-name[href*="space.bilibili.com"], a.up-name[href*="space.bilibili.com"]');
+            const top = link && link.closest('.up-detail-top');
+            if (!link || !top) return;
+
+            const uid = extractUid(link.getAttribute('href'));
+            const upName = link.childNodes.length
+                ? Array.from(link.childNodes)
+                    .filter(node => node.nodeType === Node.TEXT_NODE)
+                    .map(node => node.textContent.trim())
+                    .join('')
+                    .trim()
+                : link.textContent.trim();
+            if (!uid || !upName) return;
+
+            container.setAttribute('data-toblack-processed', 'true');
+            if (top.querySelector(`.bilibili-blacklist-btn[data-uid="${uid}"]`)) return;
+
+            const btn = createBlacklistButton(uid, upName);
+            btn.classList.add('video-upinfo-blacklist-btn');
+            link.after(btn);
+            added = true;
+            log('视频页右侧 UP 信息按钮已添加:', upName, uid);
+        });
+
+        const upnameDivs = document.querySelectorAll('div.upname:not([data-toblack-processed])');
+        if (upnameDivs.length === 0) return added;
+
         upnameDivs.forEach(div => {
             div.setAttribute('data-toblack-processed', 'true');
             const link = div.querySelector('a[href*="/space.bilibili.com/"], a[href*="/space/"]');
@@ -719,7 +754,7 @@
 
         const href = location.href;
         if (href.includes('/video/')) {
-            return firstOf(['#viewbox_report', '.video-info-detail', '#app .left-container']) || document.body;
+            return firstOf(['#app', '.right-container', '#viewbox_report', '.video-info-detail', '#app .left-container']) || document.body;
         }
         if (href.includes('search.bilibili.com')) {
             return firstOf([
