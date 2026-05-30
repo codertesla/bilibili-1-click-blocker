@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.1
+// @version      1.3.2
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -144,8 +144,8 @@
         }
         .up-detail-top > .bilibili-blacklist-btn.video-upinfo-blacklist-btn {
           flex: 0 0 auto !important;
-          margin-left: 8px !important;
-          margin-right: 8px !important;
+          margin-left: auto !important;
+          margin-right: 0 !important;
           font-size: 11px !important;
           padding: 1px 5px !important;
           line-height: normal !important;
@@ -681,7 +681,7 @@
 
             const btn = createBlacklistButton(uid, upName);
             btn.classList.add('video-upinfo-blacklist-btn');
-            link.after(btn);
+            top.appendChild(btn);
             added = true;
             log('视频页右侧 UP 信息按钮已添加:', upName, uid);
         });
