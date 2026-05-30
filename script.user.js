@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.2
+// @version      1.3.3
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -793,9 +793,10 @@
         log('观察节点:', target && (target.id || target.className || target.tagName));
         observer.observe(target, { childList: true, subtree: true });
 
-        // 初始 shadow 扫描 + 首次处理
+        // 初始 shadow 扫描 + 首次处理；延迟触发用于兜底 B 站异步渲染
         scheduleShadowScan(document.documentElement);
         flushShadowScan();
+        processPage();
         setTimeout(processPage, 1500);
         setTimeout(processPage, 3000);
 
