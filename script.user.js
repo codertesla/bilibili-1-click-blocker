@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.3
+// @version      1.3.4
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.3';
+    const VERSION = '1.3.4';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -793,10 +793,9 @@
         log('观察节点:', target && (target.id || target.className || target.tagName));
         observer.observe(target, { childList: true, subtree: true });
 
-        // 初始 shadow 扫描 + 首次处理；延迟触发用于兜底 B 站异步渲染
+        // 初始 shadow 扫描 + 延迟处理；避免过早改动 B 站正在挂载的 DOM
         scheduleShadowScan(document.documentElement);
         flushShadowScan();
-        processPage();
         setTimeout(processPage, 1500);
         setTimeout(processPage, 3000);
 
