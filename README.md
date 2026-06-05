@@ -1,109 +1,87 @@
-# 🚫 Bilibili 1-Click Blocker (B站一键拉黑UP主)
+# Bilibili 1-Click Blocker
 
 [![安装脚本](https://img.shields.io/badge/安装脚本-Greasy%20Fork-red.svg?style=for-the-badge&logo=tampermonkey)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 [![GitHub](https://img.shields.io/badge/GitHub-仓库-blue.svg?style=for-the-badge&logo=github)](https://github.com/codertesla/bilibili-1-click-blocker)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/codertesla/bilibili-1-click-blocker/blob/main/LICENSE)
 
-为哔哩哔哩（Bilibili）设计的极简、高效的一键拉黑工具。彻底杜绝不想看到的 UP 主，还你一个清爽的冲浪环境。
+B 站一键拉黑 UP 主脚本。把“拉黑”按钮放到首页推荐、搜索结果、视频详情页以及视频页右上角 UP 主信息区域，点击后调用 B 站官方黑名单接口，并立即移除当前页面里的相关视频卡片。
 
+## 功能
 
+- 一键拉黑 UP 主：支持首页推荐、搜索结果、视频详情页作者区、视频详情页右上角 UP 主信息区。
+- 即时清理页面：拉黑成功后自动移除当前页面中同一 UP 主的视频卡片。
+- 广告过滤：默认屏蔽首页广告卡片，并过滤视频播放页右上角广告内容。
+- 首页隐藏直播：可在油猴菜单中开启或关闭。
+- 官方黑名单同步：直接写入 B 站账号黑名单，移动端和其他终端同步生效。
+- 亮色/暗色主题适配：按钮样式会跟随 B 站主题显示。
 
-## ✨ 核心特性
+## 安装
 
-- **🚀 一键瞬移拉黑**：
-  - **首页推荐**：在 UP 主名称旁直观显示“拉黑”按钮，点击即消失。
-  - **视频详情页**：观看时发现不适？直接在视频页一键封禁。
-  - **搜索结果页**：搜索场景同步支持，全方位覆盖。
-- **🧹 纯净模式**：
-  - **自动屏蔽广告**：默认开启，自动剔除首页推广卡片，并智能识别屏蔽视频播放页右上角的广告内容。
-  - **可选隐藏直播**：不喜欢在首页看直播？菜单一键开启隐藏，专注视频内容。
-- **📋 智能管理**：
-  - 直接对接 **B站官方黑名单**，操作即刻生效，黑名单上限由 B站账号等级决定。
-  - **操作回馈**：友好的 Toast 提示，拉黑成功一目了然。
+1. 安装脚本管理器：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)。
+2. 打开 Greasy Fork 页面安装脚本：[B站一键拉黑UP主](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)。
+3. 刷新 B 站页面后生效。
 
+## 效果展示
 
-
-## 🛠️ 安装指南
-
-1. **安装脚本管理器**：
-   - [Tampermonkey](https://www.tampermonkey.net/) (推荐)
-   - [Violentmonkey](https://violentmonkey.github.io/)
-2. **点此一键安装**：
-   - 👉 [**安装 B站一键拉黑UP主脚本**](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
-3. **刷新 页面** 即可立即生效。
-
-
-## 📸 效果展示
-
-| 首页拉黑 (原生) | 视频详情页拉黑 |
+| 首页拉黑 | 视频详情页拉黑 |
 | :--- | :--- |
-| ![首页示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/homepage.avif) | ![视频页示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/videopage.avif) |
+| ![首页拉黑示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/homepage.avif) | ![视频详情页拉黑示例](https://raw.githubusercontent.com/codertesla/bilibili-1-click-blocker/main/screenshots/videopage.avif) |
 
+## 菜单配置
 
-## ⚙️ 菜单配置
+点击浏览器右上角的油猴插件图标，在本脚本菜单中可以使用：
 
-点击浏览器右上角的油猴插件图标，在本脚本的菜单中你可以：
-- **去管理黑名单**：查看已拉黑人数，跳转官网管理。
-- **首页隐藏直播卡片**：开启/关闭首页直播内容显示。
-- **屏蔽首页广告卡片**：开启/关闭推荐页的商业广告屏蔽。
+- 去管理黑名单：查看已拉黑人数，并跳转到 B 站官方黑名单管理页。
+- 首页隐藏直播卡片：开启或关闭首页直播内容隐藏。
+- 屏蔽首页广告卡片：开启或关闭推荐页商业广告过滤。
 
-> [!TIP]
-> 觉得首页还是太乱？尝试打开脚本的 **隐藏直播卡片** 和 **屏蔽广告卡片** 功能，还你一个清爽的首页！
+## 注意事项
 
+- 必须登录 B 站账号。脚本调用 B 站官方接口，未登录或登录过期时无法拉黑。
+- 拉黑是账号维度操作，会同步影响移动端 App 和其他终端。
+- 当前页面的视频卡片会立即移除，但 B 站推荐缓存可能有延迟；刷新页面或稍等片刻即可。
+- 本脚本不兼容 [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly)。该插件大幅修改 B 站 DOM 结构，适配和测试成本较高，当前不再维护兼容逻辑。
 
-
-## ⚠️ 注意事项
-
-> [!IMPORTANT]
-> - **必须登录**：脚本调用的是B站官方 API，未登录状态下无法执行拉黑操作。
-> - **账号级封禁**：拉黑操作是账号维度的，同步生效于移动端 App 和其他终端。
-> - **缓存说明**：拉黑后视频卡片会立即从当前页面移除，但 B站的推荐算法可能有几分钟延迟，刷新页面即可看到最终效果。
-
-> [!CAUTION]
-> **关于 BewlyBewly 插件**：本脚本**不兼容** [BewlyBewly](https://github.com/BewlyBewly/BewlyBewly) 插件。由于 BewlyBewly 对 B 站页面进行了大量 DOM 结构修改，适配难度较高，且开发者本地环境无法正常运行 BewlyBewly 进行测试，故已放弃适配。如果你正在使用 BewlyBewly，本脚本可能无法正常工作，敬请谅解。
-
-
-
-## ❓ 常见问题
+## 常见问题
 
 <details>
-<summary><b>Q: 拉黑后多久生效？</b></summary>
-A: API 操作是即时的。脚本会自动移除当前页面的相关卡片。如果刷新后依然看到，通常是 B站服务端的缓存，稍等片刻即可。
+<summary><b>拉黑后多久生效？</b></summary>
+
+API 操作即时生效。脚本会立即清理当前页面中可识别的相关卡片；如果刷新后仍然看到，通常是 B 站服务端推荐缓存延迟。
 </details>
 
 <details>
-<summary><b>Q: 如何取消拉黑？</b></summary>
-A: 在脚本菜单点击“去管理黑名单”，或者直接访问 B站官方 [黑名单管理页面](https://account.bilibili.com/account/blacklist)。
+<summary><b>如何取消拉黑？</b></summary>
+
+在脚本菜单点击“去管理黑名单”，或直接访问 B 站官方 [黑名单管理页面](https://account.bilibili.com/account/blacklist)。
 </details>
 
 <details>
-<summary><b>Q: 为什么有些广告屏蔽不了？</b></summary>
-A: 脚本通过匹配“广告”标识来屏蔽。对于某些绕过标识的特殊推广，欢迎反馈，我们会持续更新过滤规则。
+<summary><b>为什么有些广告没有被屏蔽？</b></summary>
+
+脚本主要通过广告标识和常见广告容器识别推广内容。若 B 站更换结构或隐藏标识，可能需要更新规则。
 </details>
 
+## 更新日志
 
+- v1.3.5 (2026-06-05)：更新 README 和效果截图，补充视频页右上角 UP 主信息区的一键拉黑说明。
+- v1.3.4 (2026-06-03)：修复初始化阶段过早修改 B 站 DOM，导致评论、推荐视频封面和列表链接等异步内容载入异常的问题。
+- v1.3.3 (2026-05-30)：优化初始化处理时机，页面已有内容会立即处理，并保留延迟兜底以兼容 B 站异步渲染。
+- v1.3.1 (2026-05-30)：适配新版视频页右上角 UP 主信息面板，在 UP 主名称右侧新增一键拉黑按钮。
+- v1.2.5 (2026-01-26)：移除 BewlyBewly 适配功能。
+- v1.2.4 (2026-01-25)：优化拉黑按钮配色，新增 B 站亮/暗主题自适应支持。
+- v1.2.3 (2026-01-15)：增强广告屏蔽能力，新增视频播放页右上角广告卡片屏蔽功能。
+- v1.2.2 (2026-01-11)：新增屏蔽首页广告卡片功能，默认开启。
+- v1.2.1 (2026-01-05)：新增首页隐藏直播卡片功能，支持菜单动态开关。
+- v1.1.4 (2025-03-11)：新增对 B 站搜索结果页的支持。
+- v1.0.0 (2025-03-10)：初始版本发布。
 
-## 📜 更新日志
+## 反馈
 
-- **v1.3.4** (2026-06-03)：修复 v1.3.3 初始化阶段过早修改 B 站 DOM，导致评论、推荐视频封面和列表链接等异步内容载入异常的问题。
-- **v1.3.3** (2026-05-30)：优化初始化处理时机，页面已有内容会立即处理，并保留延迟兜底以兼容 B 站异步渲染。
-- **v1.3.1** (2026-05-30)：适配新版视频页右上角 UP 主信息面板，在 UP 主名称右侧新增一键拉黑按钮。
-- **v1.2.5** (2026-01-26)：移除 BewlyBewly 适配功能（因适配难度大且无法测试，故放弃适配）。
-- **v1.2.4** (2026-01-25)：优化拉黑按钮配色，改为低调灰色系；新增 B 站亮/暗主题自适应支持（使用 `html.night-mode` 检测）。
-- **v1.2.3** (2026-01-15)：增强广告屏蔽能力，新增**屏蔽视频播放页右上角广告卡片**功能。
-- **v1.2.2** (2026-01-11)：新增**屏蔽首页广告卡片**功能，默认开启，回归纯净推荐。
-- **v1.2.1** (2026-01-05)：新增**首页隐藏直播卡片**功能，支持菜单动态开关。
-- **v1.1.4** (2025-03-11)：新增对 **B站搜索结果页面** 的支持。
-- **v1.0.0** (2025-03-10)：初始版本发布，核心拉黑功能实现。
+- GitHub Issues：[提交 BUG 或建议](https://github.com/codertesla/bilibili-1-click-blocker/issues)
+- Greasy Fork：[反馈区](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主/feedback)
 
-
-
-## 🤝 贡献与反馈
-
-- **提交 BUG / 建议**：[GitHub Issues](https://github.com/codertesla/bilibili-1-click-blocker/issues) 或 [Greasy Fork 反馈区](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主/feedback)
-- **致谢**：项目灵感源自 Greasy Fork 脚本 ID 526549，在此基础上进行了大量的修复与功能扩展。
-
-
+项目灵感源自 Greasy Fork 脚本 ID 526549，并在此基础上进行了修复与功能扩展。
 
 **免责声明**：本脚本仅供学习和个人使用。使用本脚本产生的任何后果由用户自行承担。
 
