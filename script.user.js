@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.4
+// @version      1.3.5
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.4';
+    const VERSION = '1.3.5';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
