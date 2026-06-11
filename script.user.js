@@ -131,13 +131,7 @@
           border-color: rgba(255, 255, 255, 0.08) !important;
         }
 
-        /* 首页：按钮放在 info--bottom 前面 */
-        .bili-video-card__info--bottom > .bilibili-blacklist-btn {
-          margin-right: 8px !important;
-          margin-left: 0 !important;
-        }
-
-        /* 视频页浮层按钮 */
+        /* 隔离浮层按钮 */
         .video-upinfo-blacklist-overlay {
           position: fixed !important;
           z-index: 1000 !important;
@@ -148,36 +142,19 @@
           z-index: 1000 !important;
           pointer-events: none !important;
         }
+        .home-card-blacklist-overlay {
+          position: fixed !important;
+          z-index: 1000 !important;
+          pointer-events: none !important;
+        }
         .video-upinfo-blacklist-overlay > .bilibili-blacklist-btn,
-        .video-card-blacklist-overlay > .bilibili-blacklist-btn {
+        .video-card-blacklist-overlay > .bilibili-blacklist-btn,
+        .home-card-blacklist-overlay > .bilibili-blacklist-btn {
           pointer-events: auto !important;
           margin: 0 !important;
           font-size: 11px !important;
           padding: 1px 5px !important;
           line-height: normal !important;
-        }
-
-        /* 卡片悬浮按钮 (备选放置方式) */
-        .blacklist-button-container {
-          position: absolute !important;
-          top: 5px !important;
-          right: 5px !important;
-          z-index: 100 !important;
-          opacity: 0 !important;
-          transition: opacity 0.2s ease !important;
-        }
-        .bili-video-card:hover .blacklist-button-container,
-        .video-card:hover .blacklist-button-container,
-        .feed-card:hover .blacklist-button-container {
-          opacity: 1 !important;
-        }
-        .blacklist-button-container .bilibili-blacklist-btn {
-          padding: 0px 4px !important;
-          font-size: 10px !important;
-          min-width: unset !important;
-          max-width: none !important;
-          white-space: nowrap !important;
-          margin: 0 !important;
         }
 
         /* Toast */
@@ -480,6 +457,11 @@
     }
 
     function removeCardsByUid(uid) {
+        for (const [card, info] of homeCardRegistry) {
+            if (info.uid === uid && card.isConnected) {
+                fadeOutAndRemove(card);
+            }
+        }
         const cardSel = [
             `.bili-video-card[data-up-id="${uid}"]`,
             `.feed-card[data-up-id="${uid}"]`,
@@ -603,45 +585,75 @@
     }
 
     // ==================== 页面处理：首页 / 搜索页 ====================
+    const homeCardOverlays = new Map();
+    const homeCardRegistry = new Map();
+
+    function removeHomeCardOverlays() {
+        for (const { overlay } of homeCardOverlays.values()) {
+            overlay.remove();
+        }
+        homeCardOverlays.clear();
+        homeCardRegistry.clear();
+    }
+
+    function positionHomeCardOverlays() {
+        for (const [anchor, entry] of homeCardOverlays) {
+            const { overlay, card } = entry;
+            if (!anchor.isConnected || !card.isConnected) {
+                overlay.remove();
+                homeCardOverlays.delete(anchor);
+                homeCardRegistry.delete(card);
+                continue;
+            }
+
+            const rect = getTextRect(anchor);
+            if (!rect) continue;
+            const outsideViewport = rect.bottom <= 0
+                || rect.top >= window.innerHeight
+                || rect.right <= 0
+                || rect.left >= window.innerWidth;
+            if (rect.width === 0 || rect.height === 0 || outsideViewport) {
+                overlay.style.display = 'none';
+                continue;
+            }
+
+            overlay.style.display = 'block';
+            const overlayWidth = overlay.offsetWidth;
+            const overlayHeight = overlay.offsetHeight;
+            const cardRect = card.getBoundingClientRect();
+            const preferredLeft = rect.right + 6;
+            const maxLeft = Math.min(cardRect.right - overlayWidth, window.innerWidth - overlayWidth);
+            overlay.style.left = `${Math.max(cardRect.left, Math.min(preferredLeft, maxLeft))}px`;
+            overlay.style.top = `${Math.max(0, rect.top + (rect.height - overlayHeight) / 2)}px`;
+        }
+    }
+
+    function mountHomeCardOverlay(card, anchor, uid, upName) {
+        if (homeCardOverlays.has(anchor)) return false;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'home-card-blacklist-overlay';
+        overlay.appendChild(createBlacklistButton(uid, upName));
+        homeCardOverlays.set(anchor, { overlay, card });
+        homeCardRegistry.set(card, { uid });
+        getOverlayRoot().appendChild(overlay);
+        positionHomeCardOverlays();
+        return true;
+    }
+
     function processHomePage() {
         if (settings.blockAdCards) removeAdCards();
 
-        const sel = HOME_CARD_SELECTORS
-            .map(s => `${s}:not([data-toblack-processed])`)
-            .join(',');
+        const sel = HOME_CARD_SELECTORS.join(',');
         const cards = queryAllDeep(sel);
         if (cards.length === 0) return;
 
         cards.forEach(card => {
-            // 立刻打标，避免同一张卡被反复处理（即使最终解析失败）
-            card.setAttribute('data-toblack-processed', 'true');
-
             const info = extractHomeOwnerInfo(card);
             if (!info) return;
-            const { uid, upName } = info;
-
-            card.setAttribute('data-up-id', uid);
-            card.classList.add(`uid_${uid}`);
-
-            // 主放置：info--bottom 前面
-            const bottomInfo = card.querySelector('.bili-video-card__info--bottom');
-            if (bottomInfo) {
-                if (!bottomInfo.querySelector('.bilibili-blacklist-btn')) {
-                    bottomInfo.prepend(createBlacklistButton(uid, upName));
-                }
-                return;
-            }
-
-            // 备选：右上角悬浮按钮
-            if (!card.querySelector('.blacklist-button-container')) {
-                if (getComputedStyle(card).position === 'static') {
-                    card.style.position = 'relative';
-                }
-                const container = document.createElement('div');
-                container.className = 'blacklist-button-container';
-                container.appendChild(createBlacklistButton(uid, upName));
-                card.appendChild(container);
-            }
+            const { uid, upName, anchor } = info;
+            if (!anchor) return;
+            mountHomeCardOverlay(card, anchor, uid, upName);
         });
     }
 
@@ -650,8 +662,10 @@
         let upName = '';
 
         const ownerLink = card.querySelector('a.bili-video-card__info--owner');
+        let anchor = null;
         if (ownerLink) {
             ownerUrl = ownerLink.getAttribute('href') || '';
+            anchor = ownerLink;
             const authorSpan = ownerLink.querySelector('span.bili-video-card__info--author');
             if (authorSpan) {
                 upName = authorSpan.getAttribute('title') || authorSpan.textContent.trim();
@@ -664,6 +678,7 @@
                 const el = card.querySelector(fallback);
                 if (!el) continue;
                 ownerUrl = el.getAttribute('href') || '';
+                anchor = el;
                 upName = el.textContent.trim();
                 break;
             }
@@ -672,20 +687,20 @@
         if (!ownerUrl) return null;
         const uid = extractUid(ownerUrl);
         if (!uid) return null;
-        return { uid, upName: upName || `UID: ${uid}` };
+        return { uid, upName: upName || `UID: ${uid}`, anchor };
     }
 
     // ==================== 页面处理：视频页 ====================
     let videoPageRetryTimer = null;
-    let videoOverlayRoot = null;
+    let overlayRoot = null;
     let videoProfileOverlay = null;
     let videoProfileTarget = null;
     const videoCardOverlays = new Map();
     const relationStateCache = new Map();
     const relationRequestCache = new Map();
 
-    function getVideoOverlayRoot() {
-        if (videoOverlayRoot) return videoOverlayRoot;
+    function getOverlayRoot() {
+        if (overlayRoot) return overlayRoot;
 
         const host = document.createElement('div');
         host.setAttribute('data-bilibili-blacklist-overlay-host', 'true');
@@ -693,8 +708,8 @@
         document.documentElement.appendChild(host);
         host.attachShadow({ mode: 'open' });
         injectStyleInto(host);
-        videoOverlayRoot = host.shadowRoot;
-        return videoOverlayRoot;
+        overlayRoot = host.shadowRoot;
+        return overlayRoot;
     }
 
     function isBlockedRelation(data) {
@@ -841,7 +856,7 @@
             btn.disabled = true;
         }
         videoProfileOverlay.appendChild(btn);
-        getVideoOverlayRoot().appendChild(videoProfileOverlay);
+        getOverlayRoot().appendChild(videoProfileOverlay);
         positionVideoProfileOverlay();
         return true;
     }
@@ -868,7 +883,7 @@
         overlay.className = 'video-card-blacklist-overlay';
         overlay.appendChild(createBlacklistButton(uid, upName));
         videoCardOverlays.set(nameEl, { overlay, card });
-        getVideoOverlayRoot().appendChild(overlay);
+        getOverlayRoot().appendChild(overlay);
         positionVideoCardOverlays();
         return true;
     }
@@ -948,6 +963,7 @@
     function processPage() {
         try {
             if (location.pathname.startsWith('/video/')) {
+                removeHomeCardOverlays();
                 processVideoPage();
             } else {
                 removeVideoProfileOverlay();
@@ -1015,6 +1031,8 @@
         window.addEventListener('scroll', positionVideoProfileOverlay, { passive: true });
         window.addEventListener('resize', positionVideoCardOverlays, { passive: true });
         window.addEventListener('scroll', positionVideoCardOverlays, { passive: true });
+        window.addEventListener('resize', positionHomeCardOverlays, { passive: true });
+        window.addEventListener('scroll', positionHomeCardOverlays, { passive: true });
 
         // 初始 shadow 扫描 + 延迟处理；避免过早改动 B 站正在挂载的 DOM
         scheduleShadowScan(document.documentElement);
