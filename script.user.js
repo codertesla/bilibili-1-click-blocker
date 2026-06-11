@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.7
+// @version      1.3.8
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.7';
+    const VERSION = '1.3.8';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -546,7 +546,7 @@
             }
         );
         registerToggleMenu(
-            () => settings.blockAdCards ? '✓ 屏蔽首页广告卡片（已开启）' : '○ 屏蔽首页广告卡片（已关闭）',
+            () => settings.blockAdCards ? '✓ 屏蔽广告和运营推广（已开启）' : '○ 屏蔽广告和运营推广（已关闭）',
             () => {
                 settings.blockAdCards = !settings.blockAdCards;
                 GM_setValue(STORAGE_KEYS.BLOCK_AD, settings.blockAdCards);
@@ -582,6 +582,12 @@
 
         // 2. 视频播放页等特定位置的广告元素
         queryAllDeep('#slide_ad, .video-card-ad-small').forEach(el => el.remove());
+
+        // 3. 视频页右侧运营推广卡片（非普通视频推荐）
+        queryAllDeep('.video-page-special-card-small a[href*="specialRecommendByOp"]').forEach(link => {
+            const card = link.closest('.video-page-special-card-small');
+            if (card) card.remove();
+        });
     }
 
     // ==================== 页面处理：首页 / 搜索页 ====================
