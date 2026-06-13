@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         B站一键拉黑UP主
-// @description  在B站首页、视频页和搜索页添加拉黑按钮，一键拉黑UP主。支持首页隐藏直播卡片、屏蔽广告卡片。
+// @description  ACG助手兼容版：基于 1.3.0，在B站首页、视频页和搜索页添加拉黑按钮；不包含新版视频页UP主信息按钮。
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.0
+// @version      1.3.9
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -15,15 +15,15 @@
 // @supportURL   https://github.com/codertesla/bilibili-1-click-blocker
 // @homepageURL  https://github.com/codertesla/bilibili-1-click-blocker
 // @license      MIT
-// @updateURL    https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
-// @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
+// @updateURL    https://github.com/codertesla/bilibili-1-click-blocker/raw/v1.3.9-acg-compatible/script.user.js
+// @downloadURL  https://github.com/codertesla/bilibili-1-click-blocker/raw/v1.3.9-acg-compatible/script.user.js
 // ==/UserScript==
 
 (function () {
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.0';
+    const VERSION = '1.3.9';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
