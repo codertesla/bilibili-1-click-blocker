@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.3.9
+// @version      1.4.0
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.3.9';
+    const VERSION = '1.4.0';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -771,6 +771,8 @@
             .catch(err => {
                 log('获取用户关系失败:', uid, err);
                 relationStateCache.set(uid, null);
+                // 60s 后清除失败缓存，允许后续重试，避免一次网络波动导致永久显示未拉黑。
+                setTimeout(() => relationStateCache.delete(uid), 60000);
                 return null;
             })
             .finally(() => {
@@ -992,6 +994,7 @@
 
     function processVideoPage() {
         if (settings.blockAdCards) removeAdCards();
+        attachVideoPlayerStateObserver();
         if (findAndProcessVideoUp()) {
             if (videoPageRetryTimer) { clearInterval(videoPageRetryTimer); videoPageRetryTimer = null; }
             return;
@@ -1016,6 +1019,7 @@
                 removeHomeCardOverlays();
                 processVideoPage();
             } else {
+                detachVideoPlayerStateObserver();
                 removeVideoProfileOverlay();
                 removeVideoCardOverlays();
                 processHomePage();
@@ -1028,6 +1032,34 @@
     // ==================== MutationObserver ====================
     let observerInitialized = false;
     let videoPlayerStateObserver = null;
+    let videoPlayerStateObserverEl = null;
+
+    function updateVideoOverlayVisibility() {
+        positionVideoProfileOverlay();
+        positionVideoCardOverlays();
+    }
+
+    // 仅在视频页监听播放器容器的 class / data-screen 变化，
+    // 避免监听整个 document 导致 B 站频繁 class 变更引起高 CPU 占用。
+    function attachVideoPlayerStateObserver() {
+        if (!videoPlayerStateObserver) return;
+        const preferred = document.querySelector(VIDEO_PLAYER_ROOT_SELECTOR);
+        const target = preferred || document.querySelector('#app') || document.body;
+        if (!target) return;
+        if (target === videoPlayerStateObserverEl && target.isConnected) return;
+        videoPlayerStateObserver.disconnect();
+        videoPlayerStateObserver.observe(target, {
+            attributes: true,
+            subtree: true,
+            attributeFilter: ['class', 'data-screen'],
+        });
+        videoPlayerStateObserverEl = target;
+    }
+
+    function detachVideoPlayerStateObserver() {
+        if (videoPlayerStateObserver) videoPlayerStateObserver.disconnect();
+        videoPlayerStateObserverEl = null;
+    }
 
     function pickObserverTarget() {
         const firstOf = (selectors) => {
@@ -1060,42 +1092,26 @@
 
         const debouncedProcess = debounce(processPage, 300);
 
-        const updateVideoOverlayVisibility = () => {
-            positionVideoProfileOverlay();
-            positionVideoCardOverlays();
-        };
-
         // 网页全屏主要通过播放器 class / data-screen 切换，不一定触发窗口 resize。
-        // 监听播放器状态，确保进入时立即隐藏浮层、退出时恢复定位。
+        // 回调仅做 matches/closest 判断（O(1)），不再对每个 mutation target 执行 querySelector（O(n)）。
+        // 观察目标由 attachVideoPlayerStateObserver() 动态绑定到播放器容器，非视频页完全 detach。
         videoPlayerStateObserver = new MutationObserver(mutations => {
-            if (!location.pathname.startsWith('/video/')) return;
             const playerStateChanged = mutations.some(m => {
                 const target = m.target;
-                if (target === document.documentElement || target === document.body) return true;
-                return target.nodeType === Node.ELEMENT_NODE
-                    && (target.matches(VIDEO_PLAYER_EXPANDED_SELECTOR)
-                        || target.matches(VIDEO_PLAYER_ROOT_SELECTOR)
-                        || Boolean(target.closest(VIDEO_PLAYER_ROOT_SELECTOR))
-                        || Boolean(target.querySelector(VIDEO_PLAYER_ROOT_SELECTOR)));
+                if (!target || target.nodeType !== Node.ELEMENT_NODE) return false;
+                return target.matches(VIDEO_PLAYER_EXPANDED_SELECTOR)
+                    || target.closest(VIDEO_PLAYER_ROOT_SELECTOR) !== null;
             });
             if (playerStateChanged) updateVideoOverlayVisibility();
-        });
-        videoPlayerStateObserver.observe(document.documentElement, {
-            attributes: true,
-            subtree: true,
-            attributeFilter: ['class', 'data-screen'],
         });
 
         const observer = new MutationObserver(mutations => {
             for (const m of mutations) {
-                if (m.type === 'childList') {
-                    for (const n of m.addedNodes) {
-                        if (n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-                            scheduleShadowScan(n);
-                        }
+                if (m.type !== 'childList') continue;
+                for (const n of m.addedNodes) {
+                    if (n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                        scheduleShadowScan(n);
                     }
-                } else if (m.type === 'attributes' && m.target && m.target.shadowRoot) {
-                    scheduleShadowScan(m.target);
                 }
             }
             debouncedProcess();
@@ -1104,12 +1120,21 @@
         const target = pickObserverTarget();
         log('观察节点:', target && (target.id || target.className || target.tagName));
         observer.observe(target, { childList: true, subtree: true });
-        window.addEventListener('resize', positionVideoProfileOverlay, { passive: true });
-        window.addEventListener('scroll', positionVideoProfileOverlay, { passive: true });
-        window.addEventListener('resize', positionVideoCardOverlays, { passive: true });
-        window.addEventListener('scroll', positionVideoCardOverlays, { passive: true });
-        window.addEventListener('resize', positionHomeCardOverlays, { passive: true });
-        window.addEventListener('scroll', positionHomeCardOverlays, { passive: true });
+        // 将三组 overlay 的 scroll/resize 定位合并到单个 requestAnimationFrame 回调，
+        // 避免每次滚动触发 6 次独立遍历。
+        let positionTick = false;
+        const tickPositionAll = () => {
+            if (positionTick) return;
+            positionTick = true;
+            requestAnimationFrame(() => {
+                positionTick = false;
+                positionVideoProfileOverlay();
+                positionVideoCardOverlays();
+                positionHomeCardOverlays();
+            });
+        };
+        window.addEventListener('resize', tickPositionAll, { passive: true });
+        window.addEventListener('scroll', tickPositionAll, { passive: true });
         document.addEventListener('fullscreenchange', updateVideoOverlayVisibility);
 
         // 初始 shadow 扫描 + 延迟处理；避免过早改动 B 站正在挂载的 DOM
