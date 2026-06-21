@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.4.0
+// @version      1.4.1
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.4.0';
+    const VERSION = '1.4.1';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -266,6 +266,13 @@
         void el.getBoundingClientRect();
         el.style.opacity = '0';
         setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
+    }
+
+    // “充电抢先看”等受保护视频使用与普通视频不同的延迟挂载流程。
+    // 在该页面扫描 Shadow DOM、删除广告节点或挂载浮层都可能打断播放器和封面初始化。
+    function isChargeProtectedVideoPage() {
+        return location.pathname.startsWith('/video/')
+            && Boolean(document.querySelector('.not-charge-high-level-cover'));
     }
 
     // ==================== Shadow DOM 支持 ====================
@@ -1015,6 +1022,14 @@
     // ==================== 统一入口 ====================
     function processPage() {
         try {
+            if (isChargeProtectedVideoPage()) {
+                detachVideoPlayerStateObserver();
+                removeVideoProfileOverlay();
+                removeVideoCardOverlays();
+                removeHomeCardOverlays();
+                return;
+            }
+
             if (location.pathname.startsWith('/video/')) {
                 removeHomeCardOverlays();
                 processVideoPage();
@@ -1106,6 +1121,13 @@
         });
 
         const observer = new MutationObserver(mutations => {
+            // 受保护视频页仅保留轻量级路由检测，不扫描或修改其动态 DOM。
+            if (isChargeProtectedVideoPage()) {
+                shadowScanQueue.clear();
+                debouncedProcess();
+                return;
+            }
+
             for (const m of mutations) {
                 if (m.type !== 'childList') continue;
                 for (const n of m.addedNodes) {
@@ -1138,8 +1160,10 @@
         document.addEventListener('fullscreenchange', updateVideoOverlayVisibility);
 
         // 初始 shadow 扫描 + 延迟处理；避免过早改动 B 站正在挂载的 DOM
-        scheduleShadowScan(document.documentElement);
-        flushShadowScan();
+        if (!isChargeProtectedVideoPage()) {
+            scheduleShadowScan(document.documentElement);
+            flushShadowScan();
+        }
         setTimeout(processPage, 1500);
         setTimeout(processPage, 3000);
 
