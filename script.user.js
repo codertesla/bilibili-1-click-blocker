@@ -4,7 +4,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.4.1
+// @version      1.5.0
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.4.1';
+    const VERSION = '1.5.0';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -61,6 +61,13 @@
         '.bili-video-card__wrap',
         '.feed-card',
     ];
+
+    // 只观察脚本真正负责的内容区。视频页故意不包含播放器和左侧主内容区。
+    const PAGE_OBSERVER_SELECTORS = {
+        video: ['.right-container'],
+        search: ['.video-list', '.search-content', '.search-page', '#app .bili-grid', '#app .bili-layout'],
+        home: ['#app .feed-list', '#i_cecream', '.bili-grid', '#app .bili-layout'],
+    };
 
     // B 站不同版本播放器的网页全屏 / 全屏状态标记
     const VIDEO_PLAYER_EXPANDED_SELECTOR = [
@@ -124,8 +131,8 @@
         .bilibili-blacklist-btn:active {
           transform: scale(0.95) !important;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .bilibili-blacklist-btn { animation: fadeIn 0.3s ease-out !important; }
+        @keyframes biliBlacklistFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .bilibili-blacklist-btn { animation: biliBlacklistFadeIn 0.3s ease-out !important; }
 
         /* 已拉黑 / 禁用态 - 亮色 */
         .bilibili-blacklist-btn:disabled,
@@ -199,9 +206,9 @@
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
           transition: opacity 0.3s ease, transform 0.3s ease !important;
           opacity: 1 !important;
-          animation: toastIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+          animation: biliBlacklistToastIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
         }
-        @keyframes toastIn {
+        @keyframes biliBlacklistToastIn {
           from { opacity: 0; transform: translateX(-50%) translateY(-20px) !important; }
           to { opacity: 1; transform: translateX(-50%) translateY(0) !important; }
         }
@@ -210,6 +217,14 @@
 
         /* 隐藏直播卡片 */
         body.hide-live-cards .floor-single-card:has(.floor-title) {
+          display: none !important;
+        }
+
+        /* 广告过滤：只隐藏，不删除 Vue 管理的节点，避免破坏 hydration */
+        body.bili-blacklist-block-ads #slide_ad,
+        body.bili-blacklist-block-ads .video-card-ad-small,
+        body.bili-blacklist-block-ads .video-page-special-card-small:has(a[href*="specialRecommendByOp"]),
+        body.bili-blacklist-block-ads .bili-blacklist-hidden-ad-card {
           display: none !important;
         }
     `;
@@ -224,14 +239,6 @@
     const log = (...args) => { if (DEBUG) console.log('[拉黑脚本]', ...args); };
 
     // ==================== 工具函数 ====================
-    function debounce(fn, wait) {
-        let timer = null;
-        return function (...args) {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn.apply(this, args), wait);
-        };
-    }
-
     function getCookie(name) {
         const re = new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\\/+^]/g, '\\$&') + '=([^;]*)');
         const m = document.cookie.match(re);
@@ -268,99 +275,38 @@
         setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
     }
 
-    // “充电抢先看”等受保护视频使用与普通视频不同的延迟挂载流程。
-    // 在该页面扫描 Shadow DOM、删除广告节点或挂载浮层都可能打断播放器和封面初始化。
-    function isChargeProtectedVideoPage() {
-        return location.pathname.startsWith('/video/')
-            && Boolean(document.querySelector('.not-charge-high-level-cover'));
-    }
-
-    // ==================== Shadow DOM 支持 ====================
-    // B 站部分区域使用 Shadow DOM（如某些第三方皮肤/插件），需要把样式注入进去并跨域查询
-    const shadowRootRegistry = new Set();
-    const injectedShadowHosts = new WeakSet();
-    const shadowScanQueue = new Set();
-    let shadowScanScheduled = false;
-
-    function scheduleShadowScan(node) {
-        if (!node) return;
-        if (node === document) node = document.documentElement;
-        if (!node || (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE)) return;
-
-        shadowScanQueue.add(node);
-        if (shadowScanScheduled) return;
-        shadowScanScheduled = true;
-
-        const runner = () => {
-            shadowScanScheduled = false;
-            const batch = Array.from(shadowScanQueue);
-            shadowScanQueue.clear();
-            batch.forEach(scanShadowHosts);
+    // ==================== DOM 边界工具 ====================
+    function collectRelated(root, selector) {
+        const results = [];
+        const seen = new Set();
+        const add = (el) => {
+            if (el && !seen.has(el)) {
+                seen.add(el);
+                results.push(el);
+            }
         };
 
-        if (typeof window.requestIdleCallback === 'function') {
-            window.requestIdleCallback(runner, { timeout: 300 });
-        } else {
-            window.requestAnimationFrame(runner);
+        if (!root) return results;
+        if (root.nodeType === Node.ELEMENT_NODE) {
+            if (root.matches(selector)) add(root);
+            add(root.closest(selector));
         }
+        if (typeof root.querySelectorAll === 'function') {
+            root.querySelectorAll(selector).forEach(add);
+        }
+        return results;
     }
 
-    function flushShadowScan() {
-        if (shadowScanQueue.size === 0) return;
-        const batch = Array.from(shadowScanQueue);
-        shadowScanQueue.clear();
-        batch.forEach(scanShadowHosts);
+    function isInsideVideoPlayer(node) {
+        const el = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+        return Boolean(el && el.closest(VIDEO_PLAYER_ROOT_SELECTOR));
     }
 
-    function scanShadowHosts(root) {
-        if (!root) return;
-        const stack = [];
-        if (root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-            for (const c of root.childNodes) {
-                if (c.nodeType === Node.ELEMENT_NODE) stack.push(c);
-            }
-        } else if (root.nodeType === Node.ELEMENT_NODE) {
-            stack.push(root);
-        }
-
-        while (stack.length) {
-            const cur = stack.pop();
-            if (cur.shadowRoot) injectStyleInto(cur);
-            const children = cur.children;
-            for (let i = 0; i < children.length; i++) stack.push(children[i]);
-        }
-    }
-
-    function injectStyleInto(host) {
-        if (!host || !host.shadowRoot) return;
-        shadowRootRegistry.add(host.shadowRoot);
-        if (injectedShadowHosts.has(host)) return;
-        if (!host.shadowRoot.querySelector('style[data-bilibili-blacklist-style]')) {
-            const style = document.createElement('style');
-            style.setAttribute('data-bilibili-blacklist-style', 'true');
-            style.textContent = STYLES;
-            host.shadowRoot.appendChild(style);
-        }
-        injectedShadowHosts.add(host);
-    }
-
-    // 定期清理已 detach 的 shadow root，避免 Set 无限增长
-    function cleanupShadowRegistry() {
-        for (const root of shadowRootRegistry) {
-            if (!root || !root.host || !root.host.isConnected) {
-                shadowRootRegistry.delete(root);
-            }
-        }
-    }
-
-    function queryAllDeep(selector) {
+    // 脚本按钮只存在页面本身或脚本自己的 Shadow Root 中，不跨界扫描第三方组件。
+    function queryOwned(selector) {
         const results = Array.from(document.querySelectorAll(selector));
-        for (const root of shadowRootRegistry) {
-            if (!root || !root.host || !root.host.isConnected) continue;
-            try {
-                const found = root.querySelectorAll(selector);
-                if (found.length) results.push(...found);
-            } catch (_) { /* 个别选择器在 shadow root 中可能报错，忽略即可 */ }
+        if (overlayRoot && overlayRoot.host && overlayRoot.host.isConnected) {
+            results.push(...overlayRoot.querySelectorAll(selector));
         }
         return results;
     }
@@ -410,7 +356,7 @@
 
     function markButtonsBlocked(uid) {
         relationStateCache.set(uid, true);
-        queryAllDeep(`.bilibili-blacklist-btn[data-uid="${uid}"]`).forEach(btn => {
+        queryOwned(`.bilibili-blacklist-btn[data-uid="${uid}"]`).forEach(btn => {
             if (btn.disabled && btn.textContent === '已拉黑') return;
             btn.textContent = '已拉黑';
             btn.disabled = true;
@@ -500,7 +446,7 @@
             `.group\\/desc[data-up-id="${uid}"]`,
             `div.uid_${uid}`,
         ].join(',');
-        queryAllDeep(cardSel).forEach(el => fadeOutAndRemove(el));
+        document.querySelectorAll(cardSel).forEach(el => fadeOutAndRemove(el));
     }
 
     function updateBlacklistCount() {
@@ -581,8 +527,8 @@
             () => {
                 settings.blockAdCards = !settings.blockAdCards;
                 GM_setValue(STORAGE_KEYS.BLOCK_AD, settings.blockAdCards);
-                showToast(settings.blockAdCards ? '已开启广告屏蔽，刷新页面生效' : '已关闭广告屏蔽');
-                if (settings.blockAdCards) removeAdCards();
+                applyAdFilterState();
+                showToast(settings.blockAdCards ? '已开启广告屏蔽' : '已关闭广告屏蔽');
             }
         );
         registerToggleMenu(
@@ -600,25 +546,26 @@
         );
     }
 
-    // ==================== 广告移除 ====================
-    function removeAdCards() {
-        if (!settings.blockAdCards) return;
-
-        // 1. 带「广告」文本标记的卡片
-        queryAllDeep('.bili-video-card__stats--text, .bili-video-card__info--text-ad').forEach(el => {
+    // ==================== 非破坏式广告过滤 ====================
+    function markAdCards(root = document) {
+        if (!settings.blockAdCards || !root) return;
+        collectRelated(root, '.bili-video-card__stats--text, .bili-video-card__info--text-ad').forEach(el => {
             if (el.textContent.trim() !== '广告') return;
             const card = el.closest('.feed-card, .bili-video-card, .video-card, .floor-single-card');
-            if (card) card.remove();
+            if (card) card.classList.add('bili-blacklist-hidden-ad-card');
         });
+    }
 
-        // 2. 视频播放页等特定位置的广告元素
-        queryAllDeep('#slide_ad, .video-card-ad-small').forEach(el => el.remove());
-
-        // 3. 视频页右侧运营推广卡片（非普通视频推荐）
-        queryAllDeep('.video-page-special-card-small a[href*="specialRecommendByOp"]').forEach(link => {
-            const card = link.closest('.video-page-special-card-small');
-            if (card) card.remove();
-        });
+    function applyAdFilterState() {
+        if (!document.body) return;
+        document.body.classList.toggle('bili-blacklist-block-ads', settings.blockAdCards);
+        if (settings.blockAdCards) {
+            markAdCards(document);
+        } else {
+            document.querySelectorAll('.bili-blacklist-hidden-ad-card').forEach(card => {
+                card.classList.remove('bili-blacklist-hidden-ad-card');
+            });
+        }
     }
 
     // ==================== 页面处理：首页 / 搜索页 ====================
@@ -678,11 +625,11 @@
         return true;
     }
 
-    function processHomePage() {
-        if (settings.blockAdCards) removeAdCards();
+    function processHomePage(root = document) {
+        markAdCards(root);
 
         const sel = HOME_CARD_SELECTORS.join(',');
-        const cards = queryAllDeep(sel);
+        const cards = collectRelated(root, sel);
         if (cards.length === 0) return;
 
         cards.forEach(card => {
@@ -729,6 +676,7 @@
 
     // ==================== 页面处理：视频页 ====================
     let videoPageRetryTimer = null;
+    let overlayHost = null;
     let overlayRoot = null;
     let videoProfileOverlay = null;
     let videoProfileTarget = null;
@@ -737,15 +685,17 @@
     const relationRequestCache = new Map();
 
     function getOverlayRoot() {
-        if (overlayRoot) return overlayRoot;
+        if (overlayRoot && overlayHost && overlayHost.isConnected) return overlayRoot;
 
-        const host = document.createElement('div');
-        host.setAttribute('data-bilibili-blacklist-overlay-host', 'true');
-        host.style.cssText = 'position:fixed;inset:0;z-index:1000;pointer-events:none;contain:layout style;';
-        document.documentElement.appendChild(host);
-        host.attachShadow({ mode: 'open' });
-        injectStyleInto(host);
-        overlayRoot = host.shadowRoot;
+        overlayHost = document.createElement('div');
+        overlayHost.setAttribute('data-bilibili-blacklist-overlay-host', 'true');
+        overlayHost.style.cssText = 'position:fixed;inset:0;z-index:1000;pointer-events:none;contain:layout style;';
+        (document.body || document.documentElement).appendChild(overlayHost);
+        overlayRoot = overlayHost.attachShadow({ mode: 'open' });
+        const style = document.createElement('style');
+        style.setAttribute('data-bilibili-blacklist-style', 'true');
+        style.textContent = STYLES;
+        overlayRoot.appendChild(style);
         return overlayRoot;
     }
 
@@ -947,228 +897,270 @@
         return true;
     }
 
-    function findAndProcessVideoUp() {
-        let added = false;
+    function processVideoProfileContainer(container) {
+        if (!settings.videoProfileButton || !container || !container.isConnected) return false;
+        const link = container.querySelector('.up-info__detail .up-detail-top > a.up-name[href*="space.bilibili.com"]');
+        const top = link && link.closest('.up-detail-top');
+        if (!link || !top || top.getClientRects().length === 0) return false;
+
+        const uid = extractUid(link.getAttribute('href'));
+        const upName = Array.from(link.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE)
+            .map(node => node.textContent.trim())
+            .join('')
+            .trim() || link.textContent.trim();
+        if (!uid || !upName) return false;
+
+        scheduleVideoProfileOverlay(link, uid, upName);
+        return true;
+    }
+
+    function processVideoRecommendationCard(card) {
+        if (!card || !card.isConnected) return false;
+        const div = card.querySelector('.card-box .info > div.upname');
+        const link = div && div.querySelector(':scope > a[href*="space.bilibili.com"]');
+        const nameEl = link && link.querySelector(':scope > span.name');
+        if (!link || !nameEl) return false;
+
+        const upName = nameEl.textContent.trim();
+        const uid = extractUid(link.getAttribute('href'));
+        if (!uid || !upName) return false;
+
+        if (!mountVideoCardOverlay(nameEl, card, uid, upName)) return false;
+        log('视频推荐列表浮层按钮已添加:', upName, uid);
+        return true;
+    }
+
+    function findAndProcessVideoUp(root = document) {
         let profileHandled = false;
+        let cardAdded = false;
 
         if (settings.videoProfileButton) {
-            const containers = document.querySelectorAll('.up-info-container');
+            const containers = collectRelated(root, '.up-info-container');
             for (const container of containers) {
-                const link = container.querySelector('.up-info__detail .up-detail-top > a.up-name[href*="space.bilibili.com"]');
-                const top = link && link.closest('.up-detail-top');
-                if (!link || !top || top.getClientRects().length === 0) continue;
-
-                const uid = extractUid(link.getAttribute('href'));
-                const upName = link.childNodes.length
-                    ? Array.from(link.childNodes)
-                        .filter(node => node.nodeType === Node.TEXT_NODE)
-                        .map(node => node.textContent.trim())
-                        .join('')
-                        .trim()
-                    : link.textContent.trim();
-                if (!uid || !upName) continue;
-
-                scheduleVideoProfileOverlay(link, uid, upName);
-                profileHandled = true;
-                break;
+                if (processVideoProfileContainer(container)) {
+                    profileHandled = true;
+                    break;
+                }
             }
         } else {
             removeVideoProfileOverlay();
         }
 
-        const upnameDivs = document.querySelectorAll('.card-box .info > div.upname');
-        if (upnameDivs.length === 0) return added || profileHandled;
-
-        upnameDivs.forEach(div => {
-            const card = div.closest('.video-page-card-small');
-            if (!card) return;
-            const link = div.querySelector(':scope > a[href*="space.bilibili.com"]');
-            if (!link) return;
-            const nameEl = link.querySelector(':scope > span.name');
-            if (!nameEl) return;
-
-            const upName = nameEl.textContent.trim();
-            const uid = extractUid(link.getAttribute('href'));
-            if (!uid || !upName) return;
-
-            if (mountVideoCardOverlay(nameEl, card, uid, upName)) {
-                added = true;
-                log('视频推荐列表浮层按钮已添加:', upName, uid);
-            }
+        collectRelated(root, '.video-page-card-small').forEach(card => {
+            if (processVideoRecommendationCard(card)) cardAdded = true;
         });
-        return added || profileHandled;
+        return { profileHandled, cardAdded };
     }
 
-    function processVideoPage() {
-        if (settings.blockAdCards) removeAdCards();
-        attachVideoPlayerStateObserver();
-        if (findAndProcessVideoUp()) {
-            if (videoPageRetryTimer) { clearInterval(videoPageRetryTimer); videoPageRetryTimer = null; }
-            return;
-        }
-        if (videoPageRetryTimer) return;
-
-        // 视频页 UP 信息有时异步加载，重试几次作为兜底
+    function scheduleVideoPageRetry() {
+        if (videoPageRetryTimer || !settings.videoProfileButton) return;
         let retry = 0;
         videoPageRetryTimer = setInterval(() => {
             retry++;
-            if (findAndProcessVideoUp() || retry >= 5) {
+            const { profileHandled } = findAndProcessVideoUp(document);
+            if (profileHandled || retry >= 5) {
                 clearInterval(videoPageRetryTimer);
                 videoPageRetryTimer = null;
             }
         }, 800);
     }
 
-    // ==================== 统一入口 ====================
-    function processPage() {
-        try {
-            if (isChargeProtectedVideoPage()) {
-                detachVideoPlayerStateObserver();
-                removeVideoProfileOverlay();
-                removeVideoCardOverlays();
-                removeHomeCardOverlays();
-                return;
-            }
+    function processVideoPage(root = document, allowRetry = root === document) {
+        markAdCards(root);
+        attachVideoPlayerStateObserver();
+        const result = findAndProcessVideoUp(root);
+        if (result.profileHandled && videoPageRetryTimer) {
+            clearInterval(videoPageRetryTimer);
+            videoPageRetryTimer = null;
+        } else if (allowRetry && !result.profileHandled) {
+            scheduleVideoPageRetry();
+        }
+    }
 
-            if (location.pathname.startsWith('/video/')) {
+    // ==================== 统一入口 ====================
+    function getPageKind() {
+        if (location.pathname.startsWith('/video/')) return 'video';
+        if (location.hostname === 'search.bilibili.com') return 'search';
+        return 'home';
+    }
+
+    function processPageRoot(root = document, allowRetry = root === document) {
+        if (!root || isInsideVideoPlayer(root)) return;
+        try {
+            if (getPageKind() === 'video') {
                 removeHomeCardOverlays();
-                processVideoPage();
+                processVideoPage(root, allowRetry);
             } else {
                 detachVideoPlayerStateObserver();
                 removeVideoProfileOverlay();
                 removeVideoCardOverlays();
-                processHomePage();
+                processHomePage(root);
             }
         } catch (err) {
             log('处理页面出错:', err);
         }
     }
 
+    function processPage() {
+        processPageRoot(document, true);
+    }
+
     // ==================== MutationObserver ====================
     let observerInitialized = false;
+    let contentObserver = null;
+    let contentObserverTargets = [];
+    let observerRebindTimer = null;
+    let activeRouteKey = '';
     let videoPlayerStateObserver = null;
-    let videoPlayerStateObserverEl = null;
+    let videoPlayerStateObserverEls = [];
+    let positionTick = false;
 
     function updateVideoOverlayVisibility() {
         positionVideoProfileOverlay();
         positionVideoCardOverlays();
     }
 
-    // 仅在视频页监听播放器容器的 class / data-screen 变化，
-    // 避免监听整个 document 导致 B 站频繁 class 变更引起高 CPU 占用。
+    function scheduleOverlayPosition() {
+        if (positionTick) return;
+        positionTick = true;
+        requestAnimationFrame(() => {
+            positionTick = false;
+            positionVideoProfileOverlay();
+            positionVideoCardOverlays();
+            positionHomeCardOverlays();
+        });
+    }
+
+    // 只监听可能承载全屏状态的元素本身，不观察播放器子树。
     function attachVideoPlayerStateObserver() {
         if (!videoPlayerStateObserver) return;
-        const preferred = document.querySelector(VIDEO_PLAYER_ROOT_SELECTOR);
-        const target = preferred || document.querySelector('#app') || document.body;
-        if (!target) return;
-        if (target === videoPlayerStateObserverEl && target.isConnected) return;
+        const targets = Array.from(new Set([
+            document.documentElement,
+            document.body,
+            ...document.querySelectorAll(VIDEO_PLAYER_ROOT_SELECTOR),
+        ].filter(Boolean)));
+        const unchanged = targets.length === videoPlayerStateObserverEls.length
+            && targets.every((el, index) => el === videoPlayerStateObserverEls[index] && el.isConnected);
+        if (unchanged) return;
+
         videoPlayerStateObserver.disconnect();
-        videoPlayerStateObserver.observe(target, {
+        targets.forEach(target => videoPlayerStateObserver.observe(target, {
             attributes: true,
-            subtree: true,
+            subtree: false,
             attributeFilter: ['class', 'data-screen'],
-        });
-        videoPlayerStateObserverEl = target;
+        }));
+        videoPlayerStateObserverEls = targets;
     }
 
     function detachVideoPlayerStateObserver() {
         if (videoPlayerStateObserver) videoPlayerStateObserver.disconnect();
-        videoPlayerStateObserverEl = null;
+        videoPlayerStateObserverEls = [];
     }
 
-    function pickObserverTarget() {
-        const firstOf = (selectors) => {
-            for (const s of selectors) {
-                const el = document.querySelector(s);
-                if (el) return el;
-            }
-            return null;
-        };
+    function pickObserverTargets() {
+        const selectors = PAGE_OBSERVER_SELECTORS[getPageKind()];
+        const candidates = selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)))
+            .filter(el => el.isConnected && !isInsideVideoPlayer(el));
+        const unique = Array.from(new Set(candidates));
+        // 如果外层容器已被观察，不再重复观察其子容器。
+        return unique.filter(el => !unique.some(other => other !== el && other.contains(el)));
+    }
 
-        const href = location.href;
-        if (href.includes('/video/')) {
-            return firstOf(['#app', '.right-container', '#viewbox_report', '.video-info-detail', '#app .left-container']) || document.body;
+    function scheduleObserverRebind(delay = 400) {
+        if (observerRebindTimer) clearTimeout(observerRebindTimer);
+        observerRebindTimer = setTimeout(() => {
+            observerRebindTimer = null;
+            bindContentObserver();
+        }, delay);
+    }
+
+    function bindContentObserver() {
+        if (!contentObserver) return;
+        const targets = pickObserverTargets();
+        const unchanged = targets.length === contentObserverTargets.length
+            && targets.every((el, index) => el === contentObserverTargets[index] && el.isConnected);
+        if (unchanged) return;
+
+        contentObserver.disconnect();
+        contentObserverTargets = targets;
+        targets.forEach(target => contentObserver.observe(target, { childList: true, subtree: true }));
+        log('观察节点:', targets.map(el => el.id || el.className || el.tagName));
+        if (targets.length === 0) scheduleObserverRebind(500);
+    }
+
+    function handleContentMutations(mutations) {
+        const roots = new Set();
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                const root = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+                if (!root || isInsideVideoPlayer(root)) continue;
+                if (root.closest('[data-bilibili-blacklist-overlay-host]')) continue;
+                roots.add(root);
+            }
         }
-        if (href.includes('search.bilibili.com')) {
-            return firstOf([
-                '.video-list', '.search-content', '.search-page',
-                '#app .bili-grid', '#app .bili-layout', '#app',
-            ]) || document.body;
+        roots.forEach(root => processPageRoot(root, false));
+        scheduleOverlayPosition();
+    }
+
+    function resetPageState() {
+        if (observerRebindTimer) {
+            clearTimeout(observerRebindTimer);
+            observerRebindTimer = null;
         }
-        return firstOf([
-            '#app .feed-list', '#i_cecream', '.bili-grid',
-            '#app .bili-layout', '#app',
-        ]) || document.body;
+        if (videoPageRetryTimer) {
+            clearInterval(videoPageRetryTimer);
+            videoPageRetryTimer = null;
+        }
+        detachVideoPlayerStateObserver();
+        removeVideoProfileOverlay();
+        removeVideoCardOverlays();
+        removeHomeCardOverlays();
+    }
+
+    function handleRouteChange() {
+        resetPageState();
+        bindContentObserver();
+        requestAnimationFrame(processPage);
+        setTimeout(() => {
+            bindContentObserver();
+            processPage();
+        }, 600);
     }
 
     function setupObserver() {
         if (observerInitialized) return;
         observerInitialized = true;
 
-        const debouncedProcess = debounce(processPage, 300);
+        videoPlayerStateObserver = new MutationObserver(updateVideoOverlayVisibility);
+        contentObserver = new MutationObserver(handleContentMutations);
+        activeRouteKey = `${location.hostname}${location.pathname}`;
+        bindContentObserver();
 
-        // 网页全屏主要通过播放器 class / data-screen 切换，不一定触发窗口 resize。
-        // 回调仅做 matches/closest 判断（O(1)），不再对每个 mutation target 执行 querySelector（O(n)）。
-        // 观察目标由 attachVideoPlayerStateObserver() 动态绑定到播放器容器，非视频页完全 detach。
-        videoPlayerStateObserver = new MutationObserver(mutations => {
-            const playerStateChanged = mutations.some(m => {
-                const target = m.target;
-                if (!target || target.nodeType !== Node.ELEMENT_NODE) return false;
-                return target.matches(VIDEO_PLAYER_EXPANDED_SELECTOR)
-                    || target.closest(VIDEO_PLAYER_ROOT_SELECTOR) !== null;
-            });
-            if (playerStateChanged) updateVideoOverlayVisibility();
-        });
-
-        const observer = new MutationObserver(mutations => {
-            // 受保护视频页仅保留轻量级路由检测，不扫描或修改其动态 DOM。
-            if (isChargeProtectedVideoPage()) {
-                shadowScanQueue.clear();
-                debouncedProcess();
-                return;
-            }
-
-            for (const m of mutations) {
-                if (m.type !== 'childList') continue;
-                for (const n of m.addedNodes) {
-                    if (n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-                        scheduleShadowScan(n);
-                    }
-                }
-            }
-            debouncedProcess();
-        });
-
-        const target = pickObserverTarget();
-        log('观察节点:', target && (target.id || target.className || target.tagName));
-        observer.observe(target, { childList: true, subtree: true });
-        // 将三组 overlay 的 scroll/resize 定位合并到单个 requestAnimationFrame 回调，
-        // 避免每次滚动触发 6 次独立遍历。
-        let positionTick = false;
-        const tickPositionAll = () => {
-            if (positionTick) return;
-            positionTick = true;
-            requestAnimationFrame(() => {
-                positionTick = false;
-                positionVideoProfileOverlay();
-                positionVideoCardOverlays();
-                positionHomeCardOverlays();
-            });
-        };
-        window.addEventListener('resize', tickPositionAll, { passive: true });
-        window.addEventListener('scroll', tickPositionAll, { passive: true });
+        window.addEventListener('resize', scheduleOverlayPosition, { passive: true });
+        window.addEventListener('scroll', scheduleOverlayPosition, { passive: true });
         document.addEventListener('fullscreenchange', updateVideoOverlayVisibility);
 
-        // 初始 shadow 扫描 + 延迟处理；避免过早改动 B 站正在挂载的 DOM
-        if (!isChargeProtectedVideoPage()) {
-            scheduleShadowScan(document.documentElement);
-            flushShadowScan();
-        }
-        setTimeout(processPage, 1500);
-        setTimeout(processPage, 3000);
+        // 轮询只负责 SPA 路由和容器替换，不读取或改写页面业务 DOM。
+        setInterval(() => {
+            const routeKey = `${location.hostname}${location.pathname}`;
+            if (routeKey !== activeRouteKey) {
+                activeRouteKey = routeKey;
+                handleRouteChange();
+                return;
+            }
+            if (getPageKind() === 'video') attachVideoPlayerStateObserver();
+            if (contentObserverTargets.length === 0 || contentObserverTargets.some(el => !el.isConnected)) {
+                bindContentObserver();
+                processPage();
+            }
+        }, 800);
 
-        // 定期清理已 detach 的 shadow root，避免内存泄漏
-        setInterval(cleanupShadowRegistry, 30000);
+        setTimeout(processPage, 300);
+        setTimeout(() => {
+            bindContentObserver();
+            processPage();
+        }, 1500);
     }
 
     // ==================== 样式注入 ====================
@@ -1198,6 +1190,7 @@
 
         registerToggleMenus();
         applyHideLiveClass();
+        applyAdFilterState();
         setupObserver();
         updateBlacklistCount();
         log('脚本初始化完成');
