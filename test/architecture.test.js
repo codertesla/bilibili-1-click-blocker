@@ -23,15 +23,31 @@ test('metadata and runtime versions stay aligned', () => {
 });
 
 test('video content observer is restricted to the right column', () => {
-    const selectors = section('const PAGE_OBSERVER_SELECTORS', '// B 站不同版本播放器');
+    const selectors = section('const PAGE_OBSERVER_SELECTORS', 'const VIDEO_PLAYER_ROOT_SELECTOR');
     const videoSelector = selectors.match(/video:\s*\[[^\]]*\]/)?.[0];
     assert.equal(videoSelector, "video: ['.right-container']");
 });
 
-test('player state observer never watches the player subtree', () => {
-    const observer = section('function attachVideoPlayerStateObserver()', 'function detachVideoPlayerStateObserver()');
-    assert.match(observer, /subtree:\s*false/);
-    assert.doesNotMatch(observer, /subtree:\s*true/);
+test('buttons use inline mounts without detached overlay infrastructure', () => {
+    assert.match(source, /createElement\('span'\)/);
+    assert.match(source, /bili-blacklist-inline/);
+    assert.doesNotMatch(source, /attachShadow|blacklist-overlay|positionVideoCardOverlays|positionHomeCardOverlays/);
+    assert.doesNotMatch(source, /addEventListener\('scroll'/);
+});
+
+test('inline mounts are safe siblings instead of children of author links', () => {
+    const mounts = section('// ==================== 受控内联挂载', '// ==================== 统一入口');
+    assert.match(mounts, /anchor\.insertAdjacentElement\('afterend', mount\)/);
+    assert.match(mounts, /link\.insertAdjacentElement\('afterend', mount\)/);
+    assert.match(mounts, /top\.appendChild\(mount\)/);
+    assert.doesNotMatch(mounts, /link\.appendChild\(.*bilibili-blacklist/s);
+});
+
+test('inline mounts are idempotent and replace stale UIDs on reused cards', () => {
+    const mounts = section('function createInlineMount(', '// ==================== 页面处理：首页');
+    assert.match(mounts, /existing\.dataset\.biliBlacklistUid === uid/);
+    assert.match(mounts, /if \(existing\) existing\.remove\(\)/);
+    assert.match(mounts, /mount\.dataset\.biliBlacklistUid = uid/);
 });
 
 test('ad filtering is non-destructive', () => {
@@ -46,15 +62,17 @@ test('global Shadow DOM scanning and paid-page bypass stay removed', () => {
 });
 
 test('content mutations are processed incrementally', () => {
-    const handler = section('function handleContentMutations(', 'function resetPageState()');
+    const handler = section('function scheduleContentRoot(', 'function resetPageState()');
     assert.match(handler, /mutation\.addedNodes/);
-    assert.match(handler, /processPageRoot\(root, false\)/);
+    assert.match(handler, /processPageRoot\(item, false\)/);
     assert.match(handler, /isInsideVideoPlayer\(root\)/);
+    assert.match(handler, /root\.closest\('\.bili-blacklist-inline'\)/);
+    assert.match(handler, /requestAnimationFrame/);
 });
 
-test('SPA lifecycle rebinds content and late player roots', () => {
+test('SPA lifecycle removes owned inline nodes and rebinds content', () => {
     const observer = section('function resetPageState()', '// ==================== 样式注入');
     assert.match(observer, /clearTimeout\(observerRebindTimer\)/);
+    assert.match(observer, /removeInlineButtons\(\)/);
     assert.match(observer, /handleRouteChange\(\)/);
-    assert.match(observer, /getPageKind\(\) === 'video'\) attachVideoPlayerStateObserver\(\)/);
 });
