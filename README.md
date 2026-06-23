@@ -1,6 +1,7 @@
 # Bilibili 1-Click Blocker
 
 [![安装脚本](https://img.shields.io/greasyfork/v/529390?style=for-the-badge&label=%E5%AE%89%E8%A3%85%E8%84%9A%E6%9C%AC&logo=tampermonkey&color=red)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
+[![总安装量](https://img.shields.io/greasyfork/dt/529390?style=for-the-badge&label=%E6%80%BB%E5%AE%89%E8%A3%85%E9%87%8F&logo=tampermonkey&color=red)](https://greasyfork.org/zh-CN/scripts/529390-B站首页和视频页一键拉黑UP主)
 [![GitHub](https://img.shields.io/badge/GitHub-仓库-blue.svg?style=for-the-badge&logo=github)](https://github.com/codertesla/bilibili-1-click-blocker)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/codertesla/bilibili-1-click-blocker/blob/main/LICENSE)
 
