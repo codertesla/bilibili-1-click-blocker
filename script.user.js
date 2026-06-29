@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Bilibili B站一键拉黑UP主、屏蔽视频与广告
+// @name         B站一键拉黑UP主
+// @name:zh-CN   Bilibili B站一键拉黑UP主、屏蔽视频与广告
 // @description  在 Bilibili / B站首页、搜索页、视频页添加一键拉黑 UP 主按钮，支持屏蔽视频卡片、隐藏直播、过滤广告和运营推广。
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.6.2
+// @version      1.6.3
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -23,7 +24,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.6.2';
+    const VERSION = '1.6.3';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
