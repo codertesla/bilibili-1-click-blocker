@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         B站一键拉黑UP主
-// @description  在B站首页、视频页和搜索页添加拉黑按钮，一键拉黑UP主。支持首页隐藏直播卡片、屏蔽广告卡片。
+// @name         Bilibili B站一键拉黑UP主、屏蔽视频与广告
+// @description  在 Bilibili / B站首页、搜索页、视频页添加一键拉黑 UP 主按钮，支持屏蔽视频卡片、隐藏直播、过滤广告和运营推广。
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.6.1
+// @version      1.6.2
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -15,15 +15,15 @@
 // @supportURL   https://github.com/codertesla/bilibili-1-click-blocker
 // @homepageURL  https://github.com/codertesla/bilibili-1-click-blocker
 // @license      MIT
-// @updateURL    https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
-// @downloadURL  https://greasyfork.org/zh-CN/scripts/529390-b站首页和视频页一键拉黑up主
+// @updateURL    https://update.greasyfork.org/scripts/529390/script.user.js
+// @downloadURL  https://update.greasyfork.org/scripts/529390/script.user.js
 // ==/UserScript==
 
 (function () {
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.6.1';
+    const VERSION = '1.6.2';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
