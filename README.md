@@ -23,6 +23,17 @@ Bilibili / B站一键拉黑 UP 主、屏蔽视频与广告脚本。把“拉黑�
 2. 打开 Greasy Fork 页面安装脚本：[Bilibili B站一键拉黑UP主、屏蔽视频与广告](https://greasyfork.org/zh-CN/scripts/529390-bilibili-b站一键拉黑up主-屏蔽视频与广告)。
 3. 刷新 B 站页面后生效。
 
+## 相关推荐脚本
+
+这些也是我写的 Bilibili / B 站油猴脚本，可以按需搭配使用：
+
+| 脚本 | 适合场景 | 安装 | 源码 |
+| :--- | :--- | :--- | :--- |
+| Bilibili 增强进度条 | 暂停视频时显示当前进度条，可切换为永久显示，并展示已缓冲进度。 | [Greasy Fork](https://greasyfork.org/scripts/585382) | [GitHub](https://github.com/codertesla/bilibili-enhanced-progress-bar) |
+| B 站嘴替小助手 | 根据当前视频内容调用 AI 生成一条可编辑的中文评论，适合想快速起草评论时使用。 | [Greasy Fork](https://greasyfork.org/scripts/583255) | [GitHub](https://github.com/codertesla/bili-comment-buddy) |
+| B站视频倍速器 | 自由设定 Bilibili 默认播放速度，支持快捷调速、记住设置、自动应用和键盘快捷键。 | [Greasy Fork](https://greasyfork.org/scripts/561015) | [GitHub](https://github.com/codertesla/bilibili-video-speed-controller-userscript) |
+| Bilibili 快捷评论发布 | 在视频页、番剧页和列表播放页使用 `Cmd+Enter` / `Ctrl+Enter` 快速发布评论。 | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/565212-bilibili-%E5%BF%AB%E6%8D%B7%E8%AF%84%E8%AE%BA%E5%8F%91%E5%B8%83) | [GitHub](https://github.com/codertesla/EasyComment) |
+
 ## 效果展示
 
 | 首页拉黑 | 视频详情页拉黑 |
