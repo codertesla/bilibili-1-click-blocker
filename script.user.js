@@ -5,7 +5,7 @@
 // @match        https://www.bilibili.com/*
 // @match        https://search.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
-// @version      1.6.3
+// @version      1.6.4
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
@@ -24,7 +24,7 @@
     'use strict';
 
     // ==================== 常量 ====================
-    const VERSION = '1.6.3';
+    const VERSION = '1.6.4';
 
     const API = {
         MODIFY: 'https://api.bilibili.com/x/relation/modify',
@@ -247,21 +247,40 @@
     }
 
     /**
-     * 从 UP 主主页 URL 中提取 UID，兼容多种格式：
+     * 从 UP 主主页/广告归因 URL 中提取 UID，兼容多种格式：
      *   //space.bilibili.com/123
      *   https://space.bilibili.com/123?xxx
+     *   //cm.bilibili.com/...&space_mid=123
+     *   //cm.bilibili.com/...%22video_up_mid%22%3A123
      *   /space/123/
      *   /123
      */
     function extractUid(url) {
         if (!url) return '';
-        const patterns = [
+        const sources = [url];
+        try {
+            const decoded = decodeURIComponent(url);
+            if (decoded !== url) sources.push(decoded);
+        } catch (e) {
+            // 非标准转义时继续用原始 URL 匹配。
+        }
+
+        const explicitPatterns = [
             /space\.bilibili\.com\/(\d+)/,
             /\/space\/(\d+)/,
-            /\/(\d+)(?:[\/?#]|$)/,
+            /[?&#](?:space_mid|spaceMid|video_up_mid|up_mid)=(\d+)(?:[&#]|$)/,
+            /["'](?:space_mid|spaceMid|video_up_mid|up_mid)["']\s*:\s*"?(\d+)"?/,
         ];
-        for (const re of patterns) {
-            const m = url.match(re);
+        for (const source of sources) {
+            for (const re of explicitPatterns) {
+                const m = source.match(re);
+                if (m && /^\d+$/.test(m[1])) return m[1];
+            }
+        }
+
+        for (const source of sources) {
+            if (/^[a-z][a-z0-9+.-]*:\/\//i.test(source) || source.startsWith('//')) continue;
+            const m = source.match(/\/(\d+)(?:[\/?#]|$)/);
             if (m && /^\d+$/.test(m[1])) return m[1];
         }
         return '';
@@ -925,18 +944,36 @@
         return true;
     }
 
-    function processVideoRecommendationCard(card) {
-        if (!card || !card.isConnected) return false;
+    function extractVideoRecommendationOwnerInfo(card) {
         const div = card.querySelector('.card-box .info > div.upname');
         const link = div && div.querySelector(':scope > a[href*="space.bilibili.com"]');
         const nameEl = link && link.querySelector(':scope > span.name');
-        if (!link || !nameEl) return false;
+        if (link && nameEl) {
+            const uid = extractUid(link.getAttribute('href'));
+            const upName = nameEl.textContent.trim();
+            if (uid && upName) return { uid, upName, anchor: nameEl };
+        }
 
-        const upName = nameEl.textContent.trim();
-        const uid = extractUid(link.getAttribute('href'));
-        if (!uid || !upName) return false;
+        const adLink = Array.from(card.querySelectorAll('a[href]'))
+            .find(item => extractUid(item.getAttribute('href')));
+        if (!adLink) return null;
 
-        if (!mountVideoCardOverlay(nameEl, card, uid, upName)) return false;
+        const uid = extractUid(adLink.getAttribute('href'));
+        if (!uid) return null;
+
+        const anchor = card.querySelector('.card-box .info > div.upname span.name, .card-box .info > div.upname, .upname, .name')
+            || adLink;
+        const upName = (anchor.getAttribute('title') || anchor.textContent || '').trim() || `UID: ${uid}`;
+        return { uid, upName, anchor };
+    }
+
+    function processVideoRecommendationCard(card) {
+        if (!card || !card.isConnected) return false;
+        const info = extractVideoRecommendationOwnerInfo(card);
+        if (!info) return false;
+        const { uid, upName, anchor } = info;
+
+        if (!mountVideoCardOverlay(anchor, card, uid, upName)) return false;
         log('视频推荐列表浮层按钮已添加:', upName, uid);
         return true;
     }
@@ -957,7 +994,7 @@
             removeVideoProfileOverlay();
         }
 
-        collectRelated(root, '.video-page-card-small').forEach(card => {
+        collectRelated(root, '.video-page-card-small, .video-page-special-card-small').forEach(card => {
             if (processVideoRecommendationCard(card)) cardAdded = true;
         });
         return { profileHandled, cardAdded };

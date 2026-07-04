@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const scriptPath = path.join(__dirname, '..', 'script.user.js');
 const source = fs.readFileSync(scriptPath, 'utf8');
@@ -12,6 +13,19 @@ function section(startMarker, endMarker) {
     assert.notEqual(start, -1, `missing section start: ${startMarker}`);
     assert.notEqual(end, -1, `missing section end: ${endMarker}`);
     return source.slice(start, end);
+}
+
+function functionSource(name) {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, `missing function: ${name}`);
+    const bodyStart = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = bodyStart; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        if (source[i] === '}') depth--;
+        if (depth === 0) return source.slice(start, i + 1);
+    }
+    assert.fail(`unterminated function: ${name}`);
 }
 
 test('metadata and runtime versions stay aligned', () => {
@@ -38,6 +52,21 @@ test('ad filtering is non-destructive', () => {
     const ads = section('function markAdCards(', 'function applyAdFilterState()');
     assert.match(ads, /classList\.add\('bili-blacklist-hidden-ad-card'\)/);
     assert.doesNotMatch(ads, /\.remove\s*\(/);
+});
+
+test('ad attribution URLs expose only explicit owner ids', () => {
+    const extractUid = vm.runInNewContext(`(${functionSource('extractUid')})`);
+    assert.equal(extractUid('//cm.bilibili.com/foo?space_mid=123'), '123');
+    assert.equal(extractUid('//cm.bilibili.com/foo?payload=%7B%22video_up_mid%22%3A456%7D'), '456');
+    assert.equal(extractUid('https://cm.bilibili.com/987654/path'), '');
+    assert.equal(extractUid('/123'), '123');
+});
+
+test('video recommendation processing includes special ad cards', () => {
+    const processor = section('function extractVideoRecommendationOwnerInfo(', 'function scheduleVideoPageRetry()');
+    assert.match(processor, /video-page-card-small,\s*\.video-page-special-card-small/);
+    assert.match(processor, /querySelectorAll\('a\[href\]'\)/);
+    assert.match(processor, /extractUid\(item\.getAttribute\('href'\)\)/);
 });
 
 test('global Shadow DOM scanning and paid-page bypass stay removed', () => {
